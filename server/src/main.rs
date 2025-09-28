@@ -29,6 +29,12 @@ use enigo::{Button, Enigo, Keyboard, Mouse, Settings};
 static PIPELINE_GUARD: Mutex<Option<gst::Pipeline>> = Mutex::new(None);
 static PIPELINE_INIT: Once = Once::new();
 
+// A thread-safe global container for the Enigo instance.
+// Mutex: Ensures exclusive access when a thread is using Enigo.
+// Option: Allows Enigo to be initialized later (Lazy initialization).
+static ENIGO_GUARD: Mutex<Option<Enigo>> = Mutex::new(None);
+static ENIGO_INIT: Once = Once::new();
+
 // We'll keep the GstPipelineControl for single-start logic
 type GstPipelineControl = Arc<Once>;
 
@@ -44,6 +50,15 @@ fn init_gstreamer() {
     PIPELINE_INIT.call_once(|| {
         gst::init().unwrap();
         println!("GStreamer initialized.");
+    });
+}
+
+// A function to initialize Enigo exactly once.
+fn init_enigo() {
+    ENIGO_INIT.call_once(|| {
+        let enigo = Enigo::new(&Settings::default()).expect("Failed to initialize Enigo");
+        *ENIGO_GUARD.lock().unwrap() = Some(enigo);
+        println!("Enigo initialized.");
     });
 }
 
@@ -202,57 +217,53 @@ async fn handle_connection(
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type")] // Allows for different command types in the same JSON
-enum Command {
-    #[serde(rename = "mouse_click")]
-    MouseClick { x: i32, y: i32, button: String },
-    #[serde(rename = "key_press")]
-    KeyPress { text: String },
+pub struct InputMessage {
+    pub msg: String,
+
+    #[serde(rename = "type")]
+    pub input_type: u8, // Assuming 'type' 2 is an unsigned 8-bit integer
+
+    pub x: f64, // Floating-point number for coordinates
+    pub y: f64,
 }
 
 fn handle_message(msg: Message) {
     if msg.is_text() {
         let text = msg.to_text().expect("Failed to get text from message");
-        println!("Received command: {}", text);
+        // println!("Received command: {}", text);
 
-        // let mut enigo = Enigo::new(&Settings::default()).unwrap();
-        //
-        // enigo.move_mouse(500, 200, Abs).unwrap();
-        // enigo.button(Button::Left, Click).unwrap();
-        // enigo
-        //     .text("Hello World! here is a lot of text  ❤️")
-        //     .unwrap();
+        let mut enigo_lock = ENIGO_GUARD.lock().unwrap();
+        let enigo = enigo_lock.as_mut().expect("Enigo was not initialized!");
 
-        // match serde_json::from_str::<Command>(text) {
-        //     Ok(command) => {
-        //         let mut enigo = Enigo::new(&Settings::default()).unwrap();
-        //         match command {
-        //             Command::MouseClick { x, y, button } => {
-        //                 println!("Executing MouseClick: x={}, y={}, button={}", x, y, button);
-        //                 // Convert button string to enigo::Button (simplified for example)
-        //                 let enigo_button = match button.to_lowercase().as_str() {
-        //                     "left" => Button::Left,
-        //                     "right" => Button::Right,
-        //                     "middle" => Button::Middle,
-        //                     _ => {
-        //                         eprintln!("Unknown button: {}", button);
-        //                         return;
-        //                     }
-        //                 };
-        //
-        //                 enigo.move_mouse(x, y, Abs).unwrap();
-        //                 enigo.button(enigo_button, Click).unwrap();
-        //             }
-        //             Command::KeyPress { text } => {
-        //                 println!("Executing KeyPress: text='{}'", text);
-        //                 enigo.text(&text).unwrap();
-        //             }
-        //         }
-        //     }
-        //     Err(e) => {
-        //         eprintln!("Failed to parse command JSON: {}. Original message: {}", e, text);
-        //     }
-        // }
+        match serde_json::from_str::<InputMessage>(text) {
+            Ok(msg) => {
+                // let mut enigo = Enigo::new(&Settings::default()).unwrap();
+                println!("Received message: {:?}", msg.msg);
+                println!("Received message type: {:?}", msg.input_type);
+                println!("Received message pos: {:?}, {:?}", msg.x, msg.y);
+
+                match msg.input_type {
+                    0 => {
+                        enigo.button(Button::Left, Click).unwrap();
+                    }
+                    1 => {
+                        enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                    }
+                    2_u8..=u8::MAX => {}
+                }
+
+                // enigo.button(Button::Left, Click).unwrap();
+                // enigo
+                //     .text("Hello World! here is a lot of text  ❤️")
+                //     .unwrap();
+            }
+            Err(e) => {
+                eprintln!(
+                    "Failed to parse command JSON: {}. Original message: {}",
+                    e, text
+                );
+            }
+        }
     }
     // Ignore binary, ping, pong, and close messages here
 }
@@ -282,6 +293,9 @@ async fn run_ws() -> Result<(), IoError> {
 }
 
 fn main() {
+    // Initialize Enigo here, guaranteeing it happens before any messages are processed.
+    init_enigo();
+
     let ws_handle = task::spawn(run_ws());
 
     // Block the main thread to keep the async runtime and the WS server alive.
