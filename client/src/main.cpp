@@ -42,8 +42,13 @@ namespace {
     struct MyState {
         bool connected;
 
-        int32_t width;
-        int32_t height;
+        // Window size, not video size
+        int32_t window_width;
+        int32_t window_height;
+        int32_t render_width;
+        int32_t render_height;
+        int32_t h_margin;
+        int32_t v_margin;
 
         MyConnection *connection;
         StreamApp *stream_app;
@@ -80,18 +85,39 @@ namespace {
             float x = AMotionEvent_getX(event, 0);
             float y = AMotionEvent_getY(event, 0);
 
+            if (x < state_.h_margin) {
+                x = state_.h_margin;
+            }
+            if (x > state_.window_width - state_.h_margin) {
+                x = state_.window_width;
+            }
+            if (y < state_.v_margin) {
+                y = state_.v_margin;
+            }
+            if (y > state_.window_height - state_.v_margin) {
+                y = state_.window_height;
+            }
+            x -= state_.h_margin;
+            y -= state_.v_margin;
+
+            float x_ratio = x / (float) state_.render_width;
+            float y_ratio = y / (float) state_.render_height;
+
+            float client_x = x_ratio * stream_app_get_video_width(state_.stream_app);
+            float client_y = y_ratio * stream_app_get_video_height(state_.stream_app);
+
             switch (action & AMOTION_EVENT_ACTION_MASK) {
                 case AMOTION_EVENT_ACTION_DOWN:
-                    ALOGI("INPUT: DOWN (%.1f, %.1f)", x, y);
-                    my_connection_send_input_event(state_.connection, 0, x, y);
+                    ALOGI("INPUT: DOWN (%.1f, %.1f)", client_x, client_y);
+                    my_connection_send_input_event(state_.connection, 0, client_x, client_y);
                     break;
                 case AMOTION_EVENT_ACTION_MOVE:
-                    ALOGI("INPUT: MOVE (%.1f, %.1f)", x, y);
-                    my_connection_send_input_event(state_.connection, 1, x, y);
+                    ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
+                    my_connection_send_input_event(state_.connection, 1, client_x, client_y);
                     break;
                 case AMOTION_EVENT_ACTION_UP:
-                    ALOGI("INPUT: UP (%.1f, %.1f)", x, y);
-                    my_connection_send_input_event(state_.connection, 2, x, y);
+                    ALOGI("INPUT: UP (%.1f, %.1f)", client_x, client_y);
+                    my_connection_send_input_event(state_.connection, 2, client_x, client_y);
                     break;
             }
             return 1; // Event handled
@@ -124,12 +150,10 @@ namespace {
 
                 eglQuerySurface(state_.initialEglData->display, state_.initialEglData->surface,
                                 EGL_WIDTH,
-                                &state_.width);
+                                &state_.window_width);
                 eglQuerySurface(state_.initialEglData->display, state_.initialEglData->surface,
                                 EGL_HEIGHT,
-                                &state_.height);
-
-                setenv("GST_DEBUG", "rtpulpfecdec:7", 1);
+                                &state_.window_height);
 
                 // Set up gstreamer
                 gst_init(NULL, NULL);
@@ -232,7 +256,10 @@ void android_main(struct android_app *app) {
         struct timespec decodeEndTime;
         struct MySample *sample = stream_app_try_pull_sample(state_.stream_app, &decodeEndTime);
 
-        if (sample == nullptr) {
+        uint32_t video_width = stream_app_get_video_width(state_.stream_app);
+        uint32_t video_height = stream_app_get_video_height(state_.stream_app);
+
+        if (sample == nullptr || video_width * video_height == 0) {
             if (prev_sample) {
                 // EM_POLL_RENDER_RESULT_REUSED_SAMPLE;
                 //                sample = prev_sample;
@@ -240,12 +267,29 @@ void android_main(struct android_app *app) {
             continue;
         }
 
+        float video_aspect = (float) video_width / (float) video_height;
+        float window_aspect = (float) state_.window_width / (float) state_.window_height;
+
+        // Align height
+        if (window_aspect > video_aspect) {
+            state_.render_height = state_.window_height;
+            state_.render_width = state_.render_height * video_aspect;
+        }
+            // Align width
+        else {
+            state_.render_width = state_.window_width;
+            state_.render_height = (float) state_.render_width / video_aspect;
+        }
+
+        state_.h_margin = (state_.window_width - state_.render_width) / 2;
+        state_.v_margin = (state_.window_height - state_.render_height) / 2;
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        glClearColor(0.0f, 1.0f, 0.0f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glViewport(0, 0, state_.width, state_.height);
+        glViewport(state_.h_margin, state_.v_margin, state_.render_width, state_.render_height);
 
         state_.renderer->draw(sample->frame_texture_id, sample->frame_texture_target);
 

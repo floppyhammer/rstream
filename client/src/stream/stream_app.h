@@ -68,6 +68,10 @@ struct MySample *stream_app_try_pull_sample(StreamApp *app, struct timespec *out
  */
 void stream_app_release_sample(StreamApp *app, struct MySample *ems);
 
+uint32_t stream_app_get_video_width(StreamApp *app);
+
+uint32_t stream_app_get_video_height(StreamApp *app);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus

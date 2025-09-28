@@ -567,13 +567,10 @@ struct MySample *stream_app_try_pull_sample(StreamApp *app, struct timespec *out
     gint height = GST_VIDEO_INFO_HEIGHT(&info);
     //    ALOGI("%s: frame %d (w) x %d (h)", __FUNCTION__, width, height);
 
-    // TODO: Handle resize?
-#if 0
     if (width != app->width || height != app->height) {
         app->width = width;
         app->height = height;
     }
-#endif
 
     struct MySampleImpl *ret = calloc(1, sizeof(struct MySampleImpl));
 
@@ -620,6 +617,14 @@ void stream_app_release_sample(StreamApp *app, struct MySample *sample) {
     //    ALOGI("Releasing sample with texture ID %d", impl->base.frame_texture_id);
     gst_sample_unref(impl->sample);
     free(impl);
+}
+
+uint32_t stream_app_get_video_width(StreamApp *app) {
+    return app->width;
+}
+
+uint32_t stream_app_get_video_height(StreamApp *app) {
+    return app->height;
 }
 
 static void on_need_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
@@ -682,7 +687,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
 
 #ifdef ANDROID
         // We set this up to inject the EGL context
-        gst_bus_set_sync_handler(bus, (GstBusSyncHandler)bus_sync_handler_cb, app, NULL);
+        gst_bus_set_sync_handler(bus, (GstBusSyncHandler) bus_sync_handler_cb, app, NULL);
 #endif
 
         // This just watches for errors and such
@@ -695,7 +700,8 @@ static void on_need_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
     // the pipeline will be started by the connection.
     g_signal_emit_by_name(my_conn, "set-pipeline", GST_PIPELINE(app->pipeline), NULL);
 
-    app->timeout_src_id_dot_data = g_timeout_add_seconds(3, G_SOURCE_FUNC(check_pipeline_dot_data), app->pipeline);
+    app->timeout_src_id_dot_data = g_timeout_add_seconds(3, G_SOURCE_FUNC(check_pipeline_dot_data),
+                                                         app->pipeline);
 }
 
 static void on_drop_pipeline_cb(MyConnection *my_conn, StreamApp *app) {

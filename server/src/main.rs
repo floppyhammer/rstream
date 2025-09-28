@@ -20,7 +20,7 @@ use async_std::net::{TcpListener, TcpStream};
 use async_std::task;
 use async_tungstenite::tungstenite::protocol::Message;
 use enigo::Coordinate::Abs;
-use enigo::Direction::Click;
+use enigo::Direction::{Click, Press, Release};
 use enigo::{Button, Enigo, Keyboard, Mouse, Settings};
 
 // --- FIXED: Use a thread-safe Mutex for the global pipeline ---
@@ -245,12 +245,16 @@ fn handle_message(msg: Message) {
 
                 match msg.input_type {
                     0 => {
-                        enigo.button(Button::Left, Click).unwrap();
+                        enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                        enigo.button(Button::Left, Press).unwrap();
                     }
                     1 => {
                         enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     }
-                    2_u8..=u8::MAX => {}
+                    2_u8..=u8::MAX => {
+                        enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                        enigo.button(Button::Left, Release).unwrap();
+                    }
                 }
 
                 // enigo.button(Button::Left, Click).unwrap();
