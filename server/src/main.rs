@@ -76,7 +76,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
     let port = 5600; // Fixed port for UDP stream
 
     let pipeline_str = format!(
-        "d3d11screencapturesrc ! videoconvert ! queue ! \
+        "d3d11screencapturesrc show-cursor=true ! videoconvert ! queue ! \
         x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=16000 key-int-max=120 ! \
         video/x-h264,profile=main ! rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
@@ -176,9 +176,7 @@ async fn handle_connection(
             // to run the handler without blocking the WebSocket message loop.
             if msg.is_text() {
                 let command_msg = msg.clone();
-                task::spawn_blocking(move || {
-                    handle_message(command_msg);
-                });
+                handle_text_message(command_msg);
             }
             // -----------------------------------------------
 
@@ -228,49 +226,50 @@ pub struct InputMessage {
     pub y: f64,
 }
 
-fn handle_message(msg: Message) {
-    if msg.is_text() {
-        let text = msg.to_text().expect("Failed to get text from message");
-        // println!("Received command: {}", text);
+fn handle_text_message(msg: Message) {
+    if !msg.is_text() {
+        return;
+    }
 
-        let mut enigo_lock = ENIGO_GUARD.lock().unwrap();
-        let enigo = enigo_lock.as_mut().expect("Enigo was not initialized!");
+    let text = msg.to_text().expect("Failed to get text from message");
+    // println!("Received command: {}", text);
 
-        match serde_json::from_str::<InputMessage>(text) {
-            Ok(msg) => {
-                // let mut enigo = Enigo::new(&Settings::default()).unwrap();
-                println!("Received message: {:?}", msg.msg);
-                println!("Received message type: {:?}", msg.input_type);
-                println!("Received message pos: {:?}, {:?}", msg.x, msg.y);
+    let mut enigo_lock = ENIGO_GUARD.lock().unwrap();
+    let enigo = enigo_lock.as_mut().expect("Enigo was not initialized!");
 
-                match msg.input_type {
-                    0 => {
-                        enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                        enigo.button(Button::Left, Press).unwrap();
-                    }
-                    1 => {
-                        enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                    }
-                    2_u8..=u8::MAX => {
-                        enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                        enigo.button(Button::Left, Release).unwrap();
-                    }
+    match serde_json::from_str::<InputMessage>(text) {
+        Ok(msg) => {
+            // let mut enigo = Enigo::new(&Settings::default()).unwrap();
+            println!("Received message: {:?}", msg.msg);
+            println!("Received message type: {:?}", msg.input_type);
+            println!("Received message pos: {:?}, {:?}", msg.x, msg.y);
+
+            match msg.input_type {
+                0 => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                    enigo.button(Button::Left, Press).unwrap();
                 }
+                1 => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                }
+                2_u8..=u8::MAX => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                    enigo.button(Button::Left, Release).unwrap();
+                }
+            }
 
-                // enigo.button(Button::Left, Click).unwrap();
-                // enigo
-                //     .text("Hello World! here is a lot of text  ❤️")
-                //     .unwrap();
-            }
-            Err(e) => {
-                eprintln!(
-                    "Failed to parse command JSON: {}. Original message: {}",
-                    e, text
-                );
-            }
+            // enigo.button(Button::Left, Click).unwrap();
+            // enigo
+            //     .text("Hello World! here is a lot of text  ❤️")
+            //     .unwrap();
+        }
+        Err(e) => {
+            eprintln!(
+                "Failed to parse command JSON: {}. Original message: {}",
+                e, text
+            );
         }
     }
-    // Ignore binary, ping, pong, and close messages here
 }
 
 async fn run_ws() -> Result<(), IoError> {

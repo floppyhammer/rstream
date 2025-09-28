@@ -466,13 +466,7 @@ bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
 }
 
 void my_connection_send_input_event(MyConnection *conn, int type, float x, float y) {
-    JsonBuilder *builder;
-    JsonNode *root;
-    gchar *msg_str;
-
-    ALOGI("Send input event");
-
-    builder = json_builder_new();
+    JsonBuilder *builder = json_builder_new();
     json_builder_begin_object(builder);
 
     json_builder_set_member_name(builder, "msg");
@@ -489,12 +483,14 @@ void my_connection_send_input_event(MyConnection *conn, int type, float x, float
 
     json_builder_end_object(builder);
 
-    root = json_builder_get_root(builder);
+    JsonNode *root = json_builder_get_root(builder);
 
-    msg_str = json_to_string(root, TRUE);
+    gchar *msg_str = json_to_string(root, TRUE);
     soup_websocket_connection_send_text(conn->ws, msg_str);
     g_clear_pointer(&msg_str, g_free);
 
     json_node_unref(root);
     g_object_unref(builder);
+
+    ALOGI("Sent input event");
 }
