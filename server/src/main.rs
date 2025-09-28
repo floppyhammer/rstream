@@ -153,13 +153,14 @@ async fn handle_connection(
     // --- LOGIC: Start Pipeline on First Connection ---
     let start_pipe = move || {
         init_gstreamer();
-        // Spawn a task to run the blocking pipeline start function
-        task::spawn_blocking(move || {
-            start_gstreamer_pipeline(addr);
-        });
     };
     start_once.call_once(start_pipe);
     // ---------------------------------------------------
+
+    // Spawn a task to run the blocking pipeline start function
+    task::spawn_blocking(move || {
+        start_gstreamer_pipeline(addr);
+    });
 
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
