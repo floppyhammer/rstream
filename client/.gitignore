@@ -1,0 +1,8 @@
+gstreamer_java/build/
+build*/
+local.properties
+.cxx/
+.gradle/
+.idea/
+deps/
+.kotlin/
