@@ -19,9 +19,12 @@ use futures::{
 use async_std::net::{TcpListener, TcpStream};
 use async_std::task;
 use async_tungstenite::tungstenite::protocol::Message;
+use enigo::Button::ScrollDown;
 use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
-use enigo::{Button, Enigo, Keyboard, Mouse, Settings};
+use enigo::Key::C;
+use enigo::{Button, Direction, Enigo, Keyboard, Mouse, Settings};
+use gstreamer::glib::VariantClass::DictEntry;
 
 // --- FIXED: Use a thread-safe Mutex for the global pipeline ---
 // The `Mutex` provides safe, exclusive access to the GStreamer pipeline.
@@ -171,14 +174,11 @@ async fn handle_connection(
     let broadcast_incoming = incoming
         .try_filter(|msg| future::ready(!msg.is_close()))
         .try_for_each(|msg| {
-            // --- NEW: Handle the incoming message/command ---
-            // The `enigo` operations are blocking, so we use `task::spawn_blocking`
-            // to run the handler without blocking the WebSocket message loop.
+            // Handle the incoming message/command
             if msg.is_text() {
-                let command_msg = msg.clone();
-                handle_text_message(command_msg);
+                let text_msg = msg.clone();
+                handle_text_message(text_msg);
             }
-            // -----------------------------------------------
 
             let peers = peer_map.lock().unwrap();
             let broadcast_recipients = peers
@@ -201,7 +201,7 @@ async fn handle_connection(
     println!("{} disconnected", &addr);
     peer_map.lock().unwrap().remove(&addr);
 
-    // --- LOGIC: Stop Pipeline if this was the last client ---
+    // Stop Pipeline if this was the last client
     if peer_map.lock().unwrap().is_empty() {
         // Spawn a task to run the blocking pipeline stop function
         task::spawn_blocking(stop_gstreamer_pipeline);
@@ -212,9 +212,9 @@ async fn handle_connection(
     }
 }
 
-// Define a simple structure for the commands we expect via WebSocket
 use serde::{Deserialize, Serialize};
 
+// Define a simple structure for the input events we expect via WebSocket
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InputMessage {
     pub msg: String,
@@ -240,21 +240,36 @@ fn handle_text_message(msg: Message) {
     match serde_json::from_str::<InputMessage>(text) {
         Ok(msg) => {
             // let mut enigo = Enigo::new(&Settings::default()).unwrap();
-            println!("Received message: {:?}", msg.msg);
-            println!("Received message type: {:?}", msg.input_type);
-            println!("Received message pos: {:?}, {:?}", msg.x, msg.y);
+            println!("Received message type: {:?}", msg.msg);
+            println!("Received input type: {:?}", msg.input_type);
+            println!("Received input position: {:?}, {:?}", msg.x, msg.y);
 
             match msg.input_type {
+                // Mouse button down
                 0 => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Left, Press).unwrap();
                 }
+                // Mouse button up
                 1 => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                }
-                2_u8..=u8::MAX => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Left, Release).unwrap();
+                }
+                // Mouse click
+                2 => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                }
+                3 => {
+                    if msg.y.abs() > 0.1 {
+                        enigo.scroll(-msg.y as i32, enigo::Axis::Vertical).unwrap();
+                    }
+                }
+                4 => {
+                    enigo.button(Button::Right, Click).unwrap();
+                }
+                5_u8..=u8::MAX => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                    // enigo.button(Button::Left, Release).unwrap();
                 }
             }
 

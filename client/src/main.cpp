@@ -50,6 +50,12 @@ namespace {
         int32_t h_margin;
         int32_t v_margin;
 
+        bool pressed;
+        float press_pos_x;
+        float press_pos_y;
+        float prev_pos_x;
+        float prev_pos_y;
+
         MyConnection *connection;
         StreamApp *stream_app;
 
@@ -106,18 +112,48 @@ namespace {
             float client_x = x_ratio * stream_app_get_video_width(state_.stream_app);
             float client_y = y_ratio * stream_app_get_video_height(state_.stream_app);
 
+            //AMotionEvent_getDownTime
+
             switch (action & AMOTION_EVENT_ACTION_MASK) {
                 case AMOTION_EVENT_ACTION_DOWN:
                     ALOGI("INPUT: DOWN (%.1f, %.1f)", client_x, client_y);
+                    state_.pressed = true;
+                    state_.press_pos_x = client_x;
+                    state_.press_pos_y = client_y;
+                    state_.prev_pos_x = client_x;
+                    state_.prev_pos_y = client_y;
                     my_connection_send_input_event(state_.connection, 0, client_x, client_y);
                     break;
                 case AMOTION_EVENT_ACTION_MOVE:
-                    ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
-                    my_connection_send_input_event(state_.connection, 1, client_x, client_y);
+                    if (AMotionEvent_getPointerCount(event) > 1) {
+                        float dx = client_x - state_.press_pos_x;
+                        float dy = client_y - state_.press_pos_y;
+                        ALOGI("INPUT: SCROLL (%.1f, %.1f)", dx, dy);
+                        my_connection_send_input_event(state_.connection, 3,
+                                                       dx,
+                                                       dy);
+                    } else {
+                        ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
+                        my_connection_send_input_event(state_.connection, 2, client_x, client_y);
+                    }
+
+                    state_.prev_pos_x = client_x;
+                    state_.prev_pos_y = client_y;
                     break;
                 case AMOTION_EVENT_ACTION_UP:
                     ALOGI("INPUT: UP (%.1f, %.1f)", client_x, client_y);
-                    my_connection_send_input_event(state_.connection, 2, client_x, client_y);
+                    state_.pressed = false;
+                    my_connection_send_input_event(state_.connection, 1, client_x, client_y);
+
+                    if (std::abs(state_.press_pos_x - client_x) < 10 &&
+                        std::abs(state_.press_pos_y - client_y) < 10) {
+                        ALOGI("INPUT: CLICK (%.1f, %.1f)", client_x, client_y);
+                        my_connection_send_input_event(state_.connection, 2, client_x, client_y);
+                    }
+
+//                    if (AMotionEvent_getDownTime(event) > 2) {
+//                        my_connection_send_input_event(state_.connection, 4, client_x, client_y);
+//                    }
                     break;
             }
             return 1; // Event handled
