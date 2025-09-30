@@ -387,11 +387,27 @@ static void create_pipeline_rtp(StreamApp *app) {
     GError *error = NULL;
 
     gchar *pipeline_string = g_strdup_printf(
-            "udpsrc port=5600 buffer-size=10000000 "
-            "caps=\"application/x-rtp,media=video,clock-rate=90000,encoding-name=H264\" ! "
-            "rtpjitterbuffer do-lost=1 latency=5 ! "
+            "rtpbin name=rtpbin latency=50 "
+            // Video
+            "udpsrc name=videoudpsrc port=5601 buffer-size=8000000 "
+            "caps=\"application/x-rtp,media=video,payload=96,clock-rate=90000,encoding-name=H264\" ! "
+            "rtpbin.recv_rtp_sink_0 "
+            "rtpbin. ! "
+            "rtph264depay name=depay ! "
+            "queue ! "
             "decodebin3 ! "
-            "glsinkbin name=glsink");
+            "glsinkbin name=glsink "
+            // Audio
+            "udpsrc name=audioudpsrc port=5602 buffer-size=8000000 "
+            "caps=\"application/x-rtp,media=audio,payload=127,clock-rate=48000,encoding-name=OPUS\" ! "
+            "rtpbin.recv_rtp_sink_1 "
+            "rtpbin. ! "
+            "rtpopusdepay name=audiodepay ! "
+            "queue ! "
+            "opusdec ! "
+            "queue ! "
+            "openslessink name=audiosink sync=true provide-clock=false buffer-time=20000 latency-time=20000 "
+    );
 
     app->pipeline = gst_object_ref_sink(gst_parse_launch(pipeline_string, &error));
     if (app->pipeline == NULL) {

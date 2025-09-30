@@ -76,15 +76,27 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
     }
 
     let host = addr.ip().to_string();
-    let port = 5600; // Fixed port for UDP stream
 
     let pipeline_str = format!(
-        "d3d11screencapturesrc show-cursor=true ! videoconvert ! queue ! \
+        "rtpbin name=rtpbin \
+        d3d11screencapturesrc show-cursor=true ! videoconvert ! queue ! \
         x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=16000 key-int-max=120 ! \
         video/x-h264,profile=main ! rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
-        udpsink host={} port={}",
-        host, port
+        rtpbin.send_rtp_sink_0 \
+        rtpbin. ! \
+        udpsink host={} port=5601 \
+        wasapi2src loopback=true low-latency=true ! \
+        audioconvert ! \
+        audioresample ! \
+        queue ! \
+        opusenc perfect-timestamp=false ! \
+        rtpopuspay ! \
+        application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
+        rtpbin.send_rtp_sink_1 \
+        rtpbin. ! \
+        udpsink host={} port=5602",
+        host, host
     );
 
     println!("Attempting to start pipeline to: {}...", addr);
@@ -290,7 +302,7 @@ fn handle_text_message(msg: Message) {
 async fn run_ws() -> Result<(), IoError> {
     let addr = env::args()
         .nth(1)
-        .unwrap_or_else(|| "0.0.0.0:5601".to_string());
+        .unwrap_or_else(|| "0.0.0.0:5600".to_string());
 
     let state = PeerMap::new(Mutex::new(HashMap::new()));
     let gst_control = GstPipelineControl::new(Once::new());
