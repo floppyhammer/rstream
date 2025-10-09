@@ -1,13 +1,3 @@
-// Copyright 2023, Pluto VR, Inc.
-//
-// SPDX-License-Identifier: BSL-1.0
-
-/*!
- * @file
- * @brief Main file for WebRTC client.
- * @author Moshi Turner <moses@collabora.com>
- * @author Rylie Pavlik <rpavlik@collabora.com>
- */
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 #include <GLES3/gl32.h>
@@ -15,12 +5,12 @@
 #include <android/log.h>
 #include <android/native_activity.h>
 #include <android_native_app_glue.h>
-#include <assert.h>
-#include <errno.h>
+#include <cassert>
+#include <cerrno>
 #include <gst/gst.h>
 #include <jni.h>
 #include <pthread.h>
-#include <stdbool.h>
+
 #include <unistd.h>
 
 #include <array>
@@ -30,7 +20,7 @@
 #include <memory>
 #include <thread>
 
-#include "EglData.hpp"
+#include "egl_data.hpp"
 #include "stream/gst_common.h"
 #include "stream/render/render.hpp"
 #include "stream/render/render_api.h"

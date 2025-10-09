@@ -22,7 +22,6 @@ use async_tungstenite::tungstenite::protocol::Message;
 use enigo::Button::ScrollDown;
 use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
-use enigo::Key::C;
 use enigo::{Button, Direction, Enigo, Keyboard, Mouse, Settings};
 use gstreamer::glib::VariantClass::DictEntry;
 
@@ -53,6 +52,7 @@ fn init_gstreamer() {
     PIPELINE_INIT.call_once(|| {
         gst::init().unwrap();
         println!("GStreamer initialized.");
+        gst::log::set_default_threshold(gst::DebugLevel::Info);
     });
 }
 
