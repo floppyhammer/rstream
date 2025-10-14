@@ -467,6 +467,10 @@ static void create_pipeline(StreamApp *app) {
         app->received_first_frame = false;
 
         g_object_set(glsinkbin, "sink", app->appsink, NULL);
+
+        // (sync=false) Disable audio/video clock sync to reduce latency (we have to do this after setting sink
+        // manually)
+        g_object_set(glsinkbin, "sync", FALSE, NULL);
     }
 
     g_autoptr(GstBus) bus = gst_element_get_bus(app->pipeline);

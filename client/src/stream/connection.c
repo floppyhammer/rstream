@@ -18,7 +18,7 @@
 #include <libsoup/soup-message.h>
 #include <libsoup/soup-session.h>
 
-#define DEFAULT_WEBSOCKET_URI "ws://192.168.31.187:5600/ws"
+#define DEFAULT_WEBSOCKET_URI "ws://192.168.31.188:5600/ws"
 
 /*!
  * Data required for the handshake to complete and to maintain the connection.

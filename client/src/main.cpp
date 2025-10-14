@@ -73,9 +73,74 @@ namespace {
         }
     }
 
+    int32_t handle_gamepad_key_event(const AInputEvent *event) {
+        // 1. Check if the event came from a gamepad or D-pad
+        int32_t source = AInputEvent_getSource(event);
+        if (!((source & AINPUT_SOURCE_GAMEPAD) || (source & AINPUT_SOURCE_DPAD))) {
+            return 0; // Not a gamepad or D-pad event
+        }
+
+        // 2. Get the action and key code
+        int32_t action = AKeyEvent_getAction(event);
+        int32_t key_code = AKeyEvent_getKeyCode(event);
+
+        // 3. Process the action (DOWN, UP)
+        if (action == AKEY_EVENT_ACTION_DOWN) {
+            // Button was pressed
+            switch (key_code) {
+                case AKEYCODE_BUTTON_A:
+                    ALOGI("Gamepad button A pressed");
+                    break;
+                case AKEYCODE_BUTTON_B:
+                    ALOGI("Gamepad button B pressed");
+                    break;
+                case AKEYCODE_BUTTON_X:
+                    ALOGI("Gamepad button X button pressed");
+                    break;
+                case AKEYCODE_BUTTON_Y:
+                    ALOGI("Gamepad button Y button pressed");
+                    break;
+                case AKEYCODE_DPAD_UP:
+                    ALOGI("D-Pad UP pressed");
+                    break;
+                case AKEYCODE_BUTTON_START:
+                    ALOGI("Gamepad START button pressed");
+                    break;
+                default:
+                    ALOGI("Unhandled gamepad key pressed: %d", key_code);
+                    break;
+            }
+            return 1; // Event handled
+        } else if (action == AKEY_EVENT_ACTION_UP) {
+            // Button was released (optional: for non-instant actions)
+            // LOGI("Button released: %d", keyCode);
+            return 1; // Event handled
+        }
+
+        return 0; // Event not handled by our logic
+    }
+
     // Example input handler function
     int32_t handle_input(struct android_app *app, AInputEvent *event) {
+        int res = handle_gamepad_key_event(event);
+        if (res) {
+            return 1;
+        }
+
         if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
+            int32_t source = AInputEvent_getSource(event);
+            if (source & AINPUT_SOURCE_JOYSTICK) {
+                // Get joystick axis values
+                float lx = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
+                float ly = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
+                float rx = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
+                float ry = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
+
+                ALOGI("INPUT: JOYSTICK L(%.1f, %.1f) R(%.1f, %.1f)", lx, ly, rx, ry);
+
+                return 1;
+            }
+
             int32_t action = AMotionEvent_getAction(event);
 
             float x = AMotionEvent_getX(event, 0);
