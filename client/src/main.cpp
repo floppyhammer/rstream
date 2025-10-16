@@ -10,7 +10,7 @@
 #include <gst/gst.h>
 #include <jni.h>
 #include <pthread.h>
-
+#include <optional>
 #include <unistd.h>
 
 #include <array>
@@ -45,6 +45,8 @@ namespace {
         float press_pos_y;
         float prev_pos_x;
         float prev_pos_y;
+
+        std::optional<int64_t> press_time;
 
         MyConnection *connection;
         StreamApp *stream_app;
@@ -173,37 +175,64 @@ namespace {
                 case AMOTION_EVENT_ACTION_DOWN:
                     ALOGI("INPUT: DOWN (%.1f, %.1f)", client_x, client_y);
                     state_.pressed = true;
+                    state_.press_time = g_get_monotonic_time();
                     state_.press_pos_x = client_x;
                     state_.press_pos_y = client_y;
                     state_.prev_pos_x = client_x;
                     state_.prev_pos_y = client_y;
-                    my_connection_send_input_event(state_.connection, 0, client_x, client_y);
+                    my_connection_send_input_event(state_.connection, "left-down", client_x,
+                                                   client_y);
                     break;
                 case AMOTION_EVENT_ACTION_MOVE:
                     if (AMotionEvent_getPointerCount(event) > 1) {
                         float dx = client_x - state_.press_pos_x;
                         float dy = client_y - state_.press_pos_y;
                         ALOGI("INPUT: SCROLL (%.1f, %.1f)", dx, dy);
-                        my_connection_send_input_event(state_.connection, 3,
+                        my_connection_send_input_event(state_.connection, "cursor-scroll",
                                                        dx,
                                                        dy);
                     } else {
                         ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
-                        my_connection_send_input_event(state_.connection, 2, client_x, client_y);
+                        my_connection_send_input_event(state_.connection, "cursor-move", client_x,
+                                                       client_y);
                     }
+
+                    // Cancel right click
+                    state_.press_time.reset();
 
                     state_.prev_pos_x = client_x;
                     state_.prev_pos_y = client_y;
                     break;
                 case AMOTION_EVENT_ACTION_UP:
                     ALOGI("INPUT: UP (%.1f, %.1f)", client_x, client_y);
+
+                    bool right_click = false;
+                    if (state_.press_time.has_value()) {
+                        int64_t now = g_get_monotonic_time();
+                        float duration_s = float(now - state_.press_time.value()) / 1e6;
+                        if (duration_s > 1) {
+                            right_click = true;
+                        }
+                        state_.press_time.reset();
+                    }
+
                     state_.pressed = false;
-                    my_connection_send_input_event(state_.connection, 1, client_x, client_y);
+                    my_connection_send_input_event(state_.connection, "left-up", client_x,
+                                                   client_y);
+
+                    if (right_click) {
+                        ALOGI("INPUT: RIGHT CLICK (%.1f, %.1f)", client_x, client_y);
+                        my_connection_send_input_event(state_.connection, "right-click", client_x,
+                                                       client_y);
+                        break;
+                    }
 
                     if (std::abs(state_.press_pos_x - client_x) < 10 &&
                         std::abs(state_.press_pos_y - client_y) < 10) {
                         ALOGI("INPUT: CLICK (%.1f, %.1f)", client_x, client_y);
-                        my_connection_send_input_event(state_.connection, 2, client_x, client_y);
+                        my_connection_send_input_event(state_.connection, "left-click", client_x,
+                                                       client_y);
+                        break;
                     }
 
 //                    if (AMotionEvent_getDownTime(event) > 2) {

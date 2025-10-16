@@ -18,7 +18,7 @@
 #include <libsoup/soup-message.h>
 #include <libsoup/soup-session.h>
 
-#define DEFAULT_WEBSOCKET_URI "ws://192.168.31.188:5600/ws"
+#define DEFAULT_WEBSOCKET_URI "ws://10.11.9.210:5600/ws"
 
 /*!
  * Data required for the handshake to complete and to maintain the connection.
@@ -465,15 +465,15 @@ bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
     return TRUE;
 }
 
-void my_connection_send_input_event(MyConnection *conn, int type, float x, float y) {
+void my_connection_send_input_event(MyConnection *conn, const char *type, float x, float y) {
     JsonBuilder *builder = json_builder_new();
     json_builder_begin_object(builder);
 
-    json_builder_set_member_name(builder, "msg");
+    json_builder_set_member_name(builder, "msg-type");
     json_builder_add_string_value(builder, "input");
 
-    json_builder_set_member_name(builder, "type");
-    json_builder_add_int_value(builder, type);
+    json_builder_set_member_name(builder, "input-type");
+    json_builder_add_string_value(builder, type);
 
     json_builder_set_member_name(builder, "x");
     json_builder_add_double_value(builder, x);
@@ -486,11 +486,13 @@ void my_connection_send_input_event(MyConnection *conn, int type, float x, float
     JsonNode *root = json_builder_get_root(builder);
 
     gchar *msg_str = json_to_string(root, TRUE);
+    ALOGI("Sent input message: %s", msg_str);
+
     soup_websocket_connection_send_text(conn->ws, msg_str);
     g_clear_pointer(&msg_str, g_free);
 
     json_node_unref(root);
     g_object_unref(builder);
 
-    ALOGI("Sent input event");
+
 }

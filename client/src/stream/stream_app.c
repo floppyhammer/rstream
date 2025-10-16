@@ -150,7 +150,6 @@ struct _StreamApp {
     struct {
         EGLDisplay display;
         EGLContext android_main_context;
-        // 16x16 pbuffer surface
         EGLSurface surface;
     } egl;
 
