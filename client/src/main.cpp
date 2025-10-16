@@ -311,8 +311,21 @@ namespace {
                 }
             }
                 break;
-            case APP_CMD_TERM_WINDOW:
+            case APP_CMD_TERM_WINDOW: {
                 ALOGI("APP_CMD_TERM_WINDOW");
+                stream_app_stop(state_.stream_app);
+
+                my_connection_disconnect(state_.connection);
+
+                gst_deinit();
+            }
+                break;
+            case APP_CMD_WINDOW_RESIZED:
+            case APP_CMD_CONFIG_CHANGED: {
+                ALOGI("APP_CMD_CONFIG_CHANGED");
+                state_.window_width = ANativeWindow_getWidth(app->window);
+                state_.window_height = ANativeWindow_getHeight(app->window);
+            }
                 break;
             default:
                 break;

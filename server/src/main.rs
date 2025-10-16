@@ -1,6 +1,5 @@
 use gst::prelude::*;
 use gstreamer as gst;
-use std::process;
 
 use std::{
     collections::HashMap,
@@ -229,10 +228,11 @@ use serde::{Deserialize, Serialize};
 // Define a simple structure for the input events we expect via WebSocket
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InputMessage {
-    pub msg: String,
+    #[serde(rename = "msg-type")]
+    pub msg_type: String,
 
-    #[serde(rename = "type")]
-    pub input_type: u8, // Assuming 'type' 2 is an unsigned 8-bit integer
+    #[serde(rename = "input-type")]
+    pub input_type: String,
 
     pub x: f64, // Floating-point number for coordinates
     pub y: f64,
@@ -252,37 +252,37 @@ fn handle_text_message(msg: Message) {
     match serde_json::from_str::<InputMessage>(text) {
         Ok(msg) => {
             // let mut enigo = Enigo::new(&Settings::default()).unwrap();
-            println!("Received message type: {:?}", msg.msg);
+            println!("Received message type: {:?}", msg.msg_type);
             println!("Received input type: {:?}", msg.input_type);
             println!("Received input position: {:?}, {:?}", msg.x, msg.y);
 
-            match msg.input_type {
+            match msg.input_type.as_str() {
                 // Mouse button down
-                0 => {
+                "left-down" => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Left, Press).unwrap();
                 }
                 // Mouse button up
-                1 => {
+                "left-up" => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Left, Release).unwrap();
                 }
-                // Mouse click
-                2 => {
+                "cursor-move" => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                 }
-                3 => {
+                "cursor-scroll" => {
                     if msg.y.abs() > 0.1 {
                         enigo.scroll(-msg.y as i32, enigo::Axis::Vertical).unwrap();
                     }
                 }
-                4 => {
+                "left-click" => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
+                }
+                "right-click" => {
+                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Right, Click).unwrap();
                 }
-                5_u8..=u8::MAX => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                    // enigo.button(Button::Left, Release).unwrap();
-                }
+                &_ => {}
             }
 
             // enigo.button(Button::Left, Click).unwrap();
