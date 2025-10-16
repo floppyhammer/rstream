@@ -26,6 +26,7 @@
 #include "stream/render/render_api.h"
 #include "stream/stream_app.h"
 #include "stream/connection.h"
+#include "input.h"
 
 namespace {
 
@@ -180,7 +181,9 @@ namespace {
                     state_.press_pos_y = client_y;
                     state_.prev_pos_x = client_x;
                     state_.prev_pos_y = client_y;
-                    my_connection_send_input_event(state_.connection, "left-down", client_x,
+                    my_connection_send_input_event(state_.connection,
+                                                   static_cast<int>(InputType::CursorLeftDown),
+                                                   client_x,
                                                    client_y);
                     break;
                 case AMOTION_EVENT_ACTION_MOVE:
@@ -188,12 +191,15 @@ namespace {
                         float dx = client_x - state_.press_pos_x;
                         float dy = client_y - state_.press_pos_y;
                         ALOGI("INPUT: SCROLL (%.1f, %.1f)", dx, dy);
-                        my_connection_send_input_event(state_.connection, "cursor-scroll",
+                        my_connection_send_input_event(state_.connection,
+                                                       static_cast<int>(InputType::CursorScroll),
                                                        dx,
                                                        dy);
                     } else {
                         ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
-                        my_connection_send_input_event(state_.connection, "cursor-move", client_x,
+                        my_connection_send_input_event(state_.connection,
+                                                       static_cast<int>(InputType::CursorMove),
+                                                       client_x,
                                                        client_y);
                     }
 
@@ -217,12 +223,16 @@ namespace {
                     }
 
                     state_.pressed = false;
-                    my_connection_send_input_event(state_.connection, "left-up", client_x,
+                    my_connection_send_input_event(state_.connection,
+                                                   static_cast<int>(InputType::CursorLeftUp),
+                                                   client_x,
                                                    client_y);
 
                     if (right_click) {
                         ALOGI("INPUT: RIGHT CLICK (%.1f, %.1f)", client_x, client_y);
-                        my_connection_send_input_event(state_.connection, "right-click", client_x,
+                        my_connection_send_input_event(state_.connection,
+                                                       static_cast<int>(InputType::CursorRightClick),
+                                                       client_x,
                                                        client_y);
                         break;
                     }
@@ -230,7 +240,9 @@ namespace {
                     if (std::abs(state_.press_pos_x - client_x) < 10 &&
                         std::abs(state_.press_pos_y - client_y) < 10) {
                         ALOGI("INPUT: CLICK (%.1f, %.1f)", client_x, client_y);
-                        my_connection_send_input_event(state_.connection, "left-click", client_x,
+                        my_connection_send_input_event(state_.connection,
+                                                       static_cast<int>(InputType::CursorLeftClick),
+                                                       client_x,
                                                        client_y);
                         break;
                     }

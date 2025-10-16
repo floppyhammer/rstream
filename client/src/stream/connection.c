@@ -465,7 +465,7 @@ bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
     return TRUE;
 }
 
-void my_connection_send_input_event(MyConnection *conn, const char *type, float x, float y) {
+void my_connection_send_input_event(MyConnection *conn, int type, float x, float y) {
     JsonBuilder *builder = json_builder_new();
     json_builder_begin_object(builder);
 
@@ -473,7 +473,7 @@ void my_connection_send_input_event(MyConnection *conn, const char *type, float 
     json_builder_add_string_value(builder, "input");
 
     json_builder_set_member_name(builder, "input-type");
-    json_builder_add_string_value(builder, type);
+    json_builder_add_int_value(builder, type);
 
     json_builder_set_member_name(builder, "x");
     json_builder_add_double_value(builder, x);

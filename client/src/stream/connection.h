@@ -34,7 +34,7 @@ void my_connection_disconnect(MyConnection *conn);
  */
 bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes);
 
-void my_connection_send_input_event(MyConnection *conn, const char *type, float x, float y);
+void my_connection_send_input_event(MyConnection *conn, int type, float x, float y);
 
 /*!
  * Assign a pipeline for use.

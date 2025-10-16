@@ -232,10 +232,36 @@ pub struct InputMessage {
     pub msg_type: String,
 
     #[serde(rename = "input-type")]
-    pub input_type: String,
+    pub input_type: u8,
 
     pub x: f64, // Floating-point number for coordinates
     pub y: f64,
+}
+
+#[derive(Debug, PartialEq)]
+enum InputType {
+    CursorLeftDown = 0,
+    CursorLeftUp = 1,
+    CursorLeftClick = 2,
+    CursorRightClick = 3,
+    CursorMove = 4,
+    CursorScroll = 5,
+}
+
+impl TryFrom<u8> for InputType {
+    type Error = &'static str;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(InputType::CursorLeftDown),
+            1 => Ok(InputType::CursorLeftUp),
+            2 => Ok(InputType::CursorLeftClick),
+            3 => Ok(InputType::CursorRightClick),
+            4 => Ok(InputType::CursorMove),
+            5 => Ok(InputType::CursorScroll),
+            _ => Err("Invalid integer for MyEnum"),
+        }
+    }
 }
 
 fn handle_text_message(msg: Message) {
@@ -251,44 +277,37 @@ fn handle_text_message(msg: Message) {
 
     match serde_json::from_str::<InputMessage>(text) {
         Ok(msg) => {
-            // let mut enigo = Enigo::new(&Settings::default()).unwrap();
+            let input_type = InputType::try_from(msg.input_type).unwrap();
+
             println!("Received message type: {:?}", msg.msg_type);
-            println!("Received input type: {:?}", msg.input_type);
+            println!("Received input type: {:?}", input_type);
             println!("Received input position: {:?}, {:?}", msg.x, msg.y);
 
-            match msg.input_type.as_str() {
-                // Mouse button down
-                "left-down" => {
+            match input_type {
+                InputType::CursorLeftDown => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Left, Press).unwrap();
                 }
-                // Mouse button up
-                "left-up" => {
+                InputType::CursorLeftUp => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Left, Release).unwrap();
                 }
-                "cursor-move" => {
+                InputType::CursorMove => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                 }
-                "cursor-scroll" => {
+                InputType::CursorScroll => {
                     if msg.y.abs() > 0.1 {
                         enigo.scroll(-msg.y as i32, enigo::Axis::Vertical).unwrap();
                     }
                 }
-                "left-click" => {
+                InputType::CursorLeftClick => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                 }
-                "right-click" => {
+                InputType::CursorRightClick => {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Right, Click).unwrap();
                 }
-                &_ => {}
             }
-
-            // enigo.button(Button::Left, Click).unwrap();
-            // enigo
-            //     .text("Hello World! here is a lot of text  ❤️")
-            //     .unwrap();
         }
         Err(e) => {
             eprintln!(
