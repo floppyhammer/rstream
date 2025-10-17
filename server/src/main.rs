@@ -84,7 +84,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
         rtpbin.send_rtp_sink_0 \
         rtpbin. ! \
-        udpsink host={} port=5601 \
+        udpsink host={} port=5601 sync=false \
         wasapi2src loopback=true low-latency=true ! \
         audioconvert ! \
         audioresample ! \
@@ -94,7 +94,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
         application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
         rtpbin.send_rtp_sink_1 \
         rtpbin. ! \
-        udpsink host={} port=5602",
+        udpsink host={} port=5602 sync=false",
         host, host
     );
 
