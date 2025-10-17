@@ -6,6 +6,7 @@ package com.gst.android.demo
 
 import android.app.NativeActivity
 import android.content.pm.ActivityInfo
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.PersistableBundle
 import android.util.Log
@@ -26,6 +27,8 @@ class StreamingActivity : NativeActivity() {
         )
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+
+        volumeControlStream = AudioManager.STREAM_MUSIC
 
         super.onCreate(savedInstanceState, persistentState)
     }

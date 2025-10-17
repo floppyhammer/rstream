@@ -130,6 +130,11 @@ namespace {
             return 1;
         }
 
+        // Do not handle edge actions.
+        if (AMotionEvent_getEdgeFlags(event) != AMOTION_EVENT_EDGE_FLAG_NONE) {
+            return 1;
+        }
+
         if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
             int32_t source = AInputEvent_getSource(event);
             if (source & AINPUT_SOURCE_JOYSTICK) {
@@ -149,20 +154,29 @@ namespace {
             float x = AMotionEvent_getX(event, 0);
             float y = AMotionEvent_getY(event, 0);
 
+            bool outside_host_screen = false;
             if (x < state_.h_margin) {
                 x = state_.h_margin;
+                outside_host_screen = true;
             }
             if (x > state_.window_width - state_.h_margin) {
                 x = state_.window_width;
+                outside_host_screen = true;
             }
             if (y < state_.v_margin) {
                 y = state_.v_margin;
+                outside_host_screen = true;
             }
             if (y > state_.window_height - state_.v_margin) {
                 y = state_.window_height;
+                outside_host_screen = true;
             }
             x -= state_.h_margin;
             y -= state_.v_margin;
+
+            if (outside_host_screen) {
+                return 0;
+            }
 
             float x_ratio = x / (float) state_.render_width;
             float y_ratio = y / (float) state_.render_height;
