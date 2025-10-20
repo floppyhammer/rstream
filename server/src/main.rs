@@ -23,6 +23,7 @@ use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Button, Direction, Enigo, Keyboard, Mouse, Settings};
 use gstreamer::glib::VariantClass::DictEntry;
+use vigem_client::{self as vigem, Client, TargetId, XButtons, XGamepad, Xbox360Wired};
 
 // --- FIXED: Use a thread-safe Mutex for the global pipeline ---
 // The `Mutex` provides safe, exclusive access to the GStreamer pipeline.
@@ -35,6 +36,10 @@ static PIPELINE_INIT: Once = Once::new();
 // Option: Allows Enigo to be initialized later (Lazy initialization).
 static ENIGO_GUARD: Mutex<Option<Enigo>> = Mutex::new(None);
 static ENIGO_INIT: Once = Once::new();
+
+static VIGEM_GUARD: Mutex<Option<Xbox360Wired<Client>>> = Mutex::new(None);
+static GAMEPAD_GUARD: Mutex<Option<XGamepad>> = Mutex::new(None);
+static VIGEM_INIT: Once = Once::new();
 
 // We'll keep the GstPipelineControl for single-start logic
 type GstPipelineControl = Arc<Once>;
@@ -61,6 +66,36 @@ fn init_enigo() {
         let enigo = Enigo::new(&Settings::default()).expect("Failed to initialize Enigo");
         *ENIGO_GUARD.lock().unwrap() = Some(enigo);
         println!("Enigo initialized.");
+    });
+}
+
+fn init_vigem() {
+    VIGEM_INIT.call_once(|| {
+        // 1. Connect to the ViGEmBus driver service
+        let client = vigem::Client::connect().unwrap();
+
+        println!("Vigem initialized.");
+
+        // 2. Create the virtual controller target (Xbox 360 Wired)
+        let id = TargetId::XBOX360_WIRED;
+        let mut target = vigem::Xbox360Wired::new(client, id);
+
+        // 3. Plug in the virtual controller
+        println!("Plugging in virtual Xbox 360 controller...");
+        target.plugin().unwrap();
+
+        // 4. Wait for the virtual controller to be ready to accept updates
+        println!("Waiting for controller to be ready...");
+        target.wait_ready().unwrap();
+
+        *VIGEM_GUARD.lock().unwrap() = Some(target);
+
+        let mut gamepad = XGamepad {
+            ..Default::default()
+        };
+        *GAMEPAD_GUARD.lock().unwrap() = Some(gamepad);
+
+        println!("Controller is ready.");
     });
 }
 
@@ -247,6 +282,9 @@ enum InputType {
     CursorRightClick = 3,
     CursorMove = 4,
     CursorScroll = 5,
+    GamepadButtonX = 6,
+    GamepadLeftStick = 7,
+    GamepadRightStick = 8,
 }
 
 impl TryFrom<u8> for InputType {
@@ -260,6 +298,9 @@ impl TryFrom<u8> for InputType {
             3 => Ok(InputType::CursorRightClick),
             4 => Ok(InputType::CursorMove),
             5 => Ok(InputType::CursorScroll),
+            6 => Ok(InputType::GamepadButtonX),
+            7 => Ok(InputType::GamepadLeftStick),
+            8 => Ok(InputType::GamepadRightStick),
             _ => Err("Invalid integer for MyEnum"),
         }
     }
@@ -308,6 +349,15 @@ fn handle_text_message(msg: Message) {
                     enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
                     enigo.button(Button::Right, Click).unwrap();
                 }
+                InputType::GamepadButtonX => {
+                    println!("Gamepad Button X");
+                }
+                InputType::GamepadLeftStick => {
+                    println!("Gamepad Left Stick ({}, {})", msg.x, msg.y);
+                }
+                InputType::GamepadRightStick => {
+                    println!("Gamepad Right Stick ({}, {})", msg.x, msg.y);
+                }
             }
         }
         Err(e) => {
@@ -346,6 +396,8 @@ async fn run_ws() -> Result<(), IoError> {
 fn main() {
     // Initialize Enigo here, guaranteeing it happens before any messages are processed.
     init_enigo();
+
+    init_vigem();
 
     let ws_handle = task::spawn(run_ws());
 

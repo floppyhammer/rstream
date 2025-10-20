@@ -7,4 +7,7 @@ enum class InputType {
     CursorRightClick,
     CursorMove,
     CursorScroll,
+    GamepadButtonX,
+    GamepadLeftStick,
+    GamepadRightStick,
 };
