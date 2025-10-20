@@ -5,8 +5,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "utils/logger.h"
 #include "status.h"
+#include "utils/logger.h"
 
 #define GST_USE_UNSTABLE_API
 
@@ -18,7 +18,15 @@
 #include <libsoup/soup-message.h>
 #include <libsoup/soup-session.h>
 
-#define DEFAULT_WEBSOCKET_URI "ws://10.11.9.210:5600/ws"
+// clang-format off
+#define ENET_IMPLEMENTATION
+#include "3rd/enet.h"
+// clang-format on
+
+#include "input.h"
+
+#define SERVER_ADDRESS "10.11.9.210"
+#define DEFAULT_WEBSOCKET_URI "ws://" SERVER_ADDRESS ":5600/ws"
 
 /*!
  * Data required for the handshake to complete and to maintain the connection.
@@ -35,6 +43,9 @@ struct _MyConnection {
     GstPipeline *pipeline;
 
     enum my_status status;
+
+    ENetHost *client;
+    ENetPeer *peer;
 };
 
 G_DEFINE_TYPE(MyConnection, my_connection, G_TYPE_OBJECT)
@@ -62,16 +73,15 @@ typedef enum {
 } MyConnectionProperty;
 
 static GParamSpec *properties[N_PROPERTIES] = {
-        NULL,
+    NULL,
 };
 
 /* GObject method implementations */
 
-static void my_connection_set_property(GObject *object, guint property_id, const GValue *value,
-                                       GParamSpec *pspec) {
+static void my_connection_set_property(GObject *object, guint property_id, const GValue *value, GParamSpec *pspec) {
     MyConnection *self = MY_CONNECTION(object);
 
-    switch ((MyConnectionProperty) property_id) {
+    switch ((MyConnectionProperty)property_id) {
         case PROP_WEBSOCKET_URI:
             g_free(self->websocket_uri);
             self->websocket_uri = g_value_dup_string(value);
@@ -90,16 +100,14 @@ static void conn_update_status(MyConnection *conn, enum my_status status) {
         ALOGI("conn: state update: already in %s", my_status_to_string(conn->status));
         return;
     }
-    ALOGI("conn: state update: %s -> %s", my_status_to_string(conn->status),
-          my_status_to_string(status));
+    ALOGI("conn: state update: %s -> %s", my_status_to_string(conn->status), my_status_to_string(status));
     conn->status = status;
 }
 
-static void
-my_connection_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec) {
+static void my_connection_get_property(GObject *object, guint property_id, GValue *value, GParamSpec *pspec) {
     MyConnection *self = MY_CONNECTION(object);
 
-    switch ((MyConnectionProperty) property_id) {
+    switch ((MyConnectionProperty)property_id) {
         case PROP_WEBSOCKET_URI:
             g_value_set_string(value, self->websocket_uri);
             break;
@@ -147,14 +155,13 @@ static void my_connection_class_init(MyConnectionClass *klass) {
      * The websocket URI for the signaling server
      */
     g_object_class_install_property(
-            gobject_class,
-            PROP_WEBSOCKET_URI,
-            g_param_spec_string("websocket-uri",
-                                "WebSocket URI",
-                                "WebSocket URI for signaling server.",
-                                DEFAULT_WEBSOCKET_URI /* default value */,
-                                G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE |
-                                G_PARAM_STATIC_STRINGS));
+        gobject_class,
+        PROP_WEBSOCKET_URI,
+        g_param_spec_string("websocket-uri",
+                            "WebSocket URI",
+                            "WebSocket URI for signaling server.",
+                            DEFAULT_WEBSOCKET_URI /* default value */,
+                            G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
     /**
      * MyConnection::connect
@@ -199,8 +206,7 @@ static void my_connection_class_init(MyConnectionClass *klass) {
     signals[SIGNAL_SET_PIPELINE] = g_signal_new_class_handler("set-pipeline",
                                                               G_OBJECT_CLASS_TYPE(klass),
                                                               G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-                                                              G_CALLBACK(
-                                                                      my_connection_set_pipeline),
+                                                              G_CALLBACK(my_connection_set_pipeline),
                                                               NULL,
                                                               NULL,
                                                               NULL,
@@ -304,6 +310,38 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
     g_clear_object(&conn->ws);
 
     gst_clear_object(&conn->pipeline);
+
+    // ENet
+    if (conn->peer) {
+        // Disconnect
+        enet_peer_disconnect(conn->peer, 0);
+
+        ENetEvent event = {0};
+
+        uint8_t disconnected = false;
+        /* Allow up to 3 seconds for the disconnect to succeed
+         * and drop any packets received packets.
+         */
+        while (enet_host_service(conn->client, &event, 3000) > 0) {
+            switch (event.type) {
+                case ENET_EVENT_TYPE_RECEIVE:
+                    enet_packet_destroy(event.packet);
+                    break;
+                case ENET_EVENT_TYPE_DISCONNECT:
+                    puts("Disconnection succeeded.");
+                    disconnected = true;
+                    break;
+            }
+        }
+
+        // Drop connection, since disconnection didn't succeed
+        if (!disconnected) {
+            enet_peer_reset(conn->peer);
+        }
+
+        enet_host_destroy(conn->client);
+        enet_deinitialize();
+    }
 }
 
 static void conn_connect_internal(MyConnection *conn, enum my_status status);
@@ -319,9 +357,7 @@ static void conn_webrtc_deep_notify_callback(GstObject *self,
     //	conn_update_status_from_peer_connection_state(conn, state);
 }
 
-
-static void conn_on_ws_message_cb(SoupWebsocketConnection *connection, gint type, GBytes *message,
-                                  MyConnection *conn) {
+static void conn_on_ws_message_cb(SoupWebsocketConnection *connection, gint type, GBytes *message, MyConnection *conn) {
     // ALOGD("%s", __FUNCTION__);
     gsize length = 0;
     const gchar *msg_data = g_bytes_get_data(message, &length);
@@ -330,36 +366,36 @@ static void conn_on_ws_message_cb(SoupWebsocketConnection *connection, gint type
 
     // TODO convert gsize to gssize after range check
 
-//    if (json_parser_load_from_data(parser, msg_data, length, &error)) {
-//        JsonObject *msg = json_node_get_object(json_parser_get_root(parser));
-//        const gchar *msg_type;
-//
-//        if (!json_object_has_member(msg, "msg")) {
-//            // Invalid message
-//            goto out;
-//        }
-//
-//        msg_type = json_object_get_string_member(msg, "msg");
-//        // ALOGI("Websocket message received: %s", msg_type);
-//
-//        if (g_str_equal(msg_type, "offer")) {
-//            const gchar *offer_sdp = json_object_get_string_member(msg, "sdp");
-//            conn_webrtc_process_sdp_offer(conn, offer_sdp);
-//        } else if (g_str_equal(msg_type, "candidate")) {
-//            JsonObject *candidate;
-//
-//            candidate = json_object_get_object_member(msg, "candidate");
-//
-//            conn_webrtc_process_candidate(conn,
-//                                          json_object_get_int_member(candidate, "sdpMLineIndex"),
-//                                          json_object_get_string_member(candidate, "candidate"));
-//        }
-//    } else {
-//        g_debug("Error parsing message: %s", error->message);
-//        g_clear_error(&error);
-//    }
+    //    if (json_parser_load_from_data(parser, msg_data, length, &error)) {
+    //        JsonObject *msg = json_node_get_object(json_parser_get_root(parser));
+    //        const gchar *msg_type;
+    //
+    //        if (!json_object_has_member(msg, "msg")) {
+    //            // Invalid message
+    //            goto out;
+    //        }
+    //
+    //        msg_type = json_object_get_string_member(msg, "msg");
+    //        // ALOGI("Websocket message received: %s", msg_type);
+    //
+    //        if (g_str_equal(msg_type, "offer")) {
+    //            const gchar *offer_sdp = json_object_get_string_member(msg, "sdp");
+    //            conn_webrtc_process_sdp_offer(conn, offer_sdp);
+    //        } else if (g_str_equal(msg_type, "candidate")) {
+    //            JsonObject *candidate;
+    //
+    //            candidate = json_object_get_object_member(msg, "candidate");
+    //
+    //            conn_webrtc_process_candidate(conn,
+    //                                          json_object_get_int_member(candidate, "sdpMLineIndex"),
+    //                                          json_object_get_string_member(candidate, "candidate"));
+    //        }
+    //    } else {
+    //        g_debug("Error parsing message: %s", error->message);
+    //        g_clear_error(&error);
+    //    }
 
-    out:
+out:
     g_object_unref(parser);
 }
 
@@ -368,13 +404,12 @@ static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyC
 
     g_assert(!conn->ws);
 
-    conn->ws = g_object_ref_sink(
-            soup_session_websocket_connect_finish(SOUP_SESSION(session), res, &error));
+    conn->ws = g_object_ref_sink(soup_session_websocket_connect_finish(SOUP_SESSION(session), res, &error));
 
     if (error) {
         ALOGE("Websocket connection failed, error: '%s'", error->message);
         g_signal_emit(conn, signals[SIGNAL_WEBSOCKET_FAILED], 0);
-//        conn_update_status(conn, MY_STATUS_WEBSOCKET_FAILED);
+        //        conn_update_status(conn, MY_STATUS_WEBSOCKET_FAILED);
         return;
     }
     g_assert_no_error(error);
@@ -410,7 +445,7 @@ void my_connection_set_pipeline(MyConnection *conn, GstPipeline *pipeline) {
     gst_clear_object(&conn->pipeline);
     conn->pipeline = gst_object_ref_sink(pipeline);
 
-//    conn_update_status(conn, MY_STATUS_NEGOTIATING);
+    //    conn_update_status(conn, MY_STATUS_NEGOTIATING);
 }
 
 static void conn_connect_internal(MyConnection *conn, enum my_status status) {
@@ -422,22 +457,68 @@ static void conn_connect_internal(MyConnection *conn, enum my_status status) {
 
     ALOGI("calling soup_session_websocket_connect_async. websocket_uri = %s", conn->websocket_uri);
 
-    soup_session_websocket_connect_async(
-            conn->soup_session,                                     // session
-            soup_message_new(SOUP_METHOD_GET, conn->websocket_uri), // message
-            NULL,                                                   // origin
-            NULL,                                                   // protocols
-            0,                                                      // io_prority
-            conn->ws_cancel,                                        // cancellable
-            (GAsyncReadyCallback) conn_websocket_connected_cb,       // callback
-            conn);                                                  // user_data
+    soup_session_websocket_connect_async(conn->soup_session,                                     // session
+                                         soup_message_new(SOUP_METHOD_GET, conn->websocket_uri), // message
+                                         NULL,                                                   // origin
+                                         NULL,                                                   // protocols
+                                         0,                                                      // io_prority
+                                         conn->ws_cancel,                                        // cancellable
+                                         (GAsyncReadyCallback)conn_websocket_connected_cb,       // callback
+                                         conn);                                                  // user_data
 
-//    conn_update_status(conn, status);
+    //    conn_update_status(conn, status);
+
+    // ENet
+    {
+        ENetHost *client = {0};
+        client = enet_host_create(NULL /* create a client host */,
+                                  1 /* only allow 1 outgoing connection */,
+                                  2 /* allow up 2 channels to be used, 0 and 1 */,
+                                  0 /* assume any amount of incoming bandwidth */,
+                                  0 /* assume any amount of outgoing bandwidth */);
+        if (client == NULL) {
+            ALOGE("An error occurred while trying to create an ENet client host.");
+            exit(EXIT_FAILURE);
+        }
+        conn->client = client;
+
+        ENetAddress address = {0};
+        ENetPeer *peer = {0};
+        enet_address_set_host(&address, SERVER_ADDRESS);
+        address.port = 7777;
+
+        /* Initiate the connection, allocating the two channels 0 and 1. */
+        peer = enet_host_connect(client, &address, 2, 0);
+        if (peer == NULL) {
+            ALOGE("No available peers for initiating an ENet connection.");
+            exit(EXIT_FAILURE);
+        }
+        conn->peer = peer;
+
+        ENetEvent event = {0};
+
+        /* Wait up to 5 seconds for the connection attempt to succeed. */
+        if (enet_host_service(client, &event, 5000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
+            ALOGI("Connection to enet server succeeded.");
+        } else {
+            /* Either the 5 seconds are up or a disconnect event was */
+            /* received. Reset the peer in the event the 5 seconds   */
+            /* had run out without any significant event.            */
+            enet_peer_reset(peer);
+            ALOGE("Connection to enet server failed.");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
 /* public (non-GObject) methods */
 
 MyConnection *my_connection_new(const gchar *websocket_uri) {
+    if (enet_initialize() != 0) {
+        printf("An error occurred while initializing ENet.\n");
+        abort();
+    }
+
     return MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, "websocket-uri", websocket_uri, NULL));
 }
 
@@ -461,11 +542,10 @@ bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
         return false;
     }
 
-
     return TRUE;
 }
 
-void my_connection_send_input_event(MyConnection *conn, int type, float x, float y) {
+void my_connection_send_input_event_via_json(MyConnection *conn, int type, float x, float y) {
     JsonBuilder *builder = json_builder_new();
     json_builder_begin_object(builder);
 
@@ -489,10 +569,72 @@ void my_connection_send_input_event(MyConnection *conn, int type, float x, float
     ALOGI("Sent input message: %s", msg_str);
 
     soup_websocket_connection_send_text(conn->ws, msg_str);
+
     g_clear_pointer(&msg_str, g_free);
 
     json_node_unref(root);
     g_object_unref(builder);
+}
 
+const int COMMAND_SIZE = sizeof(InputCommand);
 
+void my_connection_send_input_command_via_enet(MyConnection *conn, InputCommand *input_data) {
+    ENetPacketFlag flag = ENET_PACKET_FLAG_RELIABLE;
+
+    // For input commands that are not important.
+    if (input_data->type == CursorMove || input_data->type == GamepadLeftStick ||
+        input_data->type == GamepadRightStick) {
+        flag = ENET_PACKET_FLAG_UNSEQUENCED;
+    }
+
+    // To guarantee that the first byte of your ENet packet is exactly input_type and to avoid any compiler-imposed
+    // memory alignment headaches on ARM, you must create a plain char[] buffer and manually copy/serialize the fields
+    // one by one on the C++ client side.
+    //
+    // This is the only way to be 100% certain of the memory layout on an ambiguous architecture like ARM/Android.
+    uint8_t buffer[sizeof(InputCommand)];
+    size_t offset = 0;
+    {
+        // 1. input_type (u8): Copy raw byte
+        // This MUST be the first byte in the packet.
+        buffer[offset++] = input_data->type;
+
+        // 2. x_value (i32): Copy raw bytes
+        // We assume ARM/Android is Little-Endian, so raw copy is sufficient.
+        // Use htonl/ntohl if you wanted Big-Endian (Network Byte Order).
+        memcpy(buffer + offset, &input_data->data0, sizeof(int32_t));
+        offset += sizeof(int32_t);
+
+        // 3. y_value (i32): Copy raw bytes
+        memcpy(buffer + offset, &input_data->data1, sizeof(int32_t));
+        offset += sizeof(int32_t);
+    }
+
+    // 5. Create and send the ENet packet from the guaranteed-clean buffer
+    if (offset == COMMAND_SIZE) {
+        ENetPacket *packet = enet_packet_create(buffer, COMMAND_SIZE, flag);
+        if (packet) {
+            // peer is the ENetPeer* obtained from enet_host_connect()
+            // 0 is the channel ID you choose for input commands
+            int channel_id = 0;
+            int ret = enet_peer_send(conn->peer, channel_id, packet);
+            if (ret) {
+                ALOGE("enet_peer_send error: %d", ret);
+            }
+
+            // Flush the host to ensure the packet is sent immediately
+            enet_host_flush(conn->client);
+        }
+    } else {
+        ALOGE("Wrong command size: %zu", offset);
+    }
+}
+
+void my_connection_send_input_event(MyConnection *conn, int type, float x, float y) {
+    InputCommand cmd = {0};
+    cmd.type = type;
+    memcpy(&cmd.data0, &x, sizeof(uint32_t));
+    memcpy(&cmd.data1, &y, sizeof(uint32_t));
+
+    my_connection_send_input_command_via_enet(conn, &cmd);
 }

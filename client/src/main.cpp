@@ -21,9 +21,9 @@
 #include <thread>
 
 #include "egl_data.hpp"
-#include "input.h"
 #include "stream/connection.h"
 #include "stream/gst_common.h"
+#include "stream/input.h"
 #include "stream/render/render.hpp"
 #include "stream/render/render_api.h"
 #include "stream/stream_app.h"
@@ -342,6 +342,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
                 state_.renderer->reset();
                 abort();
             }
+
         } break;
         case APP_CMD_TERM_WINDOW: {
             ALOGI("APP_CMD_TERM_WINDOW");

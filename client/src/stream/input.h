@@ -1,6 +1,6 @@
 #pragma once
 
-enum class InputType {
+typedef enum : uint8_t {
     CursorLeftDown = 0,
     CursorLeftUp,
     CursorLeftClick,
@@ -10,4 +10,12 @@ enum class InputType {
     GamepadButtonX,
     GamepadLeftStick,
     GamepadRightStick,
-};
+} InputType;
+
+#pragma pack(push, 1)
+typedef struct {
+    uint8_t type;
+    uint32_t data0;
+    uint32_t data1;
+} InputCommand;
+#pragma pack(pop)
