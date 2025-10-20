@@ -14,16 +14,16 @@ target_include_directories(native_app_glue PUBLIC ${ANDROID_NDK}/sources/android
 # now build app's shared lib
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
-add_library(gst_android_demo SHARED main.cpp egl_data.cpp)
+add_library(rstream_client SHARED main.cpp egl_data.cpp)
 
 target_include_directories(
-        gst_android_demo PRIVATE
+        rstream_client PRIVATE
         ${GLIB_INCLUDE_DIRS} ${GST_INCLUDE_DIRS}
 )
 
 # add lib dependencies
 target_link_libraries(
-        gst_android_demo
+        rstream_client
         PRIVATE
         gst_stream_app
         gstreamer_android
@@ -36,7 +36,7 @@ target_link_libraries(
 
 # Export ANativeActivity_onCreate()
 set_property(
-        TARGET gst_android_demo
+        TARGET rstream_client
         APPEND_STRING
         PROPERTY LINK_FLAGS " -u ANativeActivity_onCreate"
 )

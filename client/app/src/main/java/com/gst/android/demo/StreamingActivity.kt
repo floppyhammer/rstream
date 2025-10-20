@@ -37,8 +37,8 @@ class StreamingActivity : NativeActivity() {
         init {
             Log.i("GstAndroidDemo", "StreamingActivity: In StreamingActivity static init")
 
-            System.loadLibrary("gst_android_demo")
-            Log.i("GstAndroidDemo", "StreamingActivity: loaded gst_android_demo")
+            System.loadLibrary("rstream_client")
+            Log.i("GstAndroidDemo", "StreamingActivity: loaded rstream_client")
         }
     }
 }

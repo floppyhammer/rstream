@@ -33,7 +33,7 @@
             <!-- Tell NativeActivity the name of our .so -->
             <meta-data
                 android:name="android.app.lib_name"
-                android:value="gst_android_demo" />
+                android:value="rstream_client" />
             <!-- Quest-specific intent filter -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

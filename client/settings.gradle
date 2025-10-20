@@ -9,4 +9,4 @@ pluginManagement {
 
 include ':gstreamer_java'
 include ':app'
-rootProject.name = "gst-android-demo"
+rootProject.name = "rstream-client"
