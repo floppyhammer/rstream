@@ -23,9 +23,6 @@ function(setForce NAME VALUE)
     )
 endfunction()
 
-setforce(BUILD_TESTING OFF)
-setforce(BUILD_DOC OFF)
-
 if (ANDROID)
     find_library(ANDROID_LOG_LIBRARY log)
     find_library(ANDROID_LIBRARY android)
@@ -59,28 +56,20 @@ if (ANDROID)
         set(GST_ARCH_DIR ${GST_BASE_DIR}/${GST_ARCH})
     endif ()
 
-    option(EMC_OLDER_GST "Some older versions of gstreamer use libsoup2.4 instead of libsoup3.0" OFF)
-    set(EMC_OLDER_GST OFF)
-
-    set(USE_GST_SHARED OFF)
-    if (USE_GST_SHARED)
-        include(libraries_shared.cmake)
-    else ()
-        include(libraries_static.cmake)
-    endif ()
+    include(libraries_static.cmake)
 
     set(GST_INCLUDE_DIRS ${GST_ARCH_DIR}/include/gstreamer-1.0/
             ${GST_ARCH_DIR}/lib/gstreamer-1.0/include/
     )
+
     set(GLIB_INCLUDE_DIRS ${GST_ARCH_DIR}/include/glib-2.0
             ${GST_ARCH_DIR}/lib/glib-2.0/include/
     )
-    if (EMC_OLDER_GST)
-        set(LIBSOUP_INCLUDE_DIRS ${GST_ARCH_DIR}/include/libsoup-2.4/)
-    else ()
-        set(LIBSOUP_INCLUDE_DIRS ${GST_ARCH_DIR}/include/libsoup-3.0/)
-    endif ()
+
+    set(LIBSOUP_INCLUDE_DIRS ${GST_ARCH_DIR}/include/libsoup-3.0/)
+
     set(JSONGLIB_INCLUDE_DIRS ${GST_ARCH_DIR}/include/json-glib-1.0)
+
     set(GIO_INCLUDE_DIRS ${GST_ARCH_DIR}/include/glib-2.0/ ${GST_ARCH_DIR}/lib/gio-unix-2.0/)
 
     add_subdirectory(gstreamer_android)
