@@ -184,6 +184,8 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
             return 0;
         }
 
+        //        bool single_touch = AMotionEvent_getPointerCount(event) == 1;
+
         float x_ratio = x / (float)state_.render_width;
         float y_ratio = y / (float)state_.render_height;
 
@@ -193,7 +195,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
         // AMotionEvent_getDownTime
 
         switch (action & AMOTION_EVENT_ACTION_MASK) {
-            case AMOTION_EVENT_ACTION_DOWN:
+            case AMOTION_EVENT_ACTION_DOWN: {
                 ALOGI("INPUT: DOWN (%.1f, %.1f)", client_x, client_y);
                 state_.pressed = true;
                 state_.press_time = g_get_monotonic_time();
@@ -205,16 +207,38 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                                                static_cast<int>(InputType::CursorLeftDown),
                                                client_x,
                                                client_y);
-                break;
+            }
+            // A second touch is down.
+            case AMOTION_EVENT_ACTION_POINTER_DOWN: {
+                int32_t action_code = action & AMOTION_EVENT_ACTION_MASK;
+                size_t pointer_index =
+                    (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
+
+                ALOGI("INPUT: pointer index %zu, action code %d", pointer_index, action_code);
+                size_t pointer_count = AMotionEvent_getPointerCount(event);
+
+                if (pointer_count > 1) {
+                    state_.pressed = false;
+                    state_.press_time.reset();
+                    ALOGI("INPUT: Multiple touch down %zu", pointer_count);
+                    break;
+                }
+            } break;
             case AMOTION_EVENT_ACTION_MOVE:
                 if (AMotionEvent_getPointerCount(event) > 1) {
-                    float dx = client_x - state_.press_pos_x;
-                    float dy = client_y - state_.press_pos_y;
+                    float dx = client_x - state_.prev_pos_x;
+                    float dy = client_y - state_.prev_pos_y;
+
+                    if (dx == 0 || dy == 0) {
+                        break;
+                    }
                     ALOGI("INPUT: SCROLL (%.1f, %.1f)", dx, dy);
                     my_connection_send_input_event(state_.connection,
                                                    static_cast<int>(InputType::CursorScroll),
                                                    dx,
                                                    dy);
+                    state_.prev_pos_x = client_x;
+                    state_.prev_pos_y = client_y;
                 } else {
                     ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
                     my_connection_send_input_event(state_.connection,

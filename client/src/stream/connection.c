@@ -24,6 +24,7 @@
 // clang-format on
 
 #include "input.h"
+#include "thread.h"
 
 #define SERVER_ADDRESS "10.11.9.210"
 #define DEFAULT_WEBSOCKET_URI "ws://" SERVER_ADDRESS ":5600/ws"
@@ -46,6 +47,7 @@ struct _MyConnection {
 
     ENetHost *client;
     ENetPeer *peer;
+    struct os_thread_helper enet_thread;
 };
 
 G_DEFINE_TYPE(MyConnection, my_connection, G_TYPE_OBJECT)
@@ -324,17 +326,17 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
          */
         while (enet_host_service(conn->client, &event, 3000) > 0) {
             switch (event.type) {
-                case ENET_EVENT_TYPE_RECEIVE:
+                case ENET_EVENT_TYPE_RECEIVE: {
                     enet_packet_destroy(event.packet);
-                    break;
-                case ENET_EVENT_TYPE_DISCONNECT:
-                    puts("Disconnection succeeded.");
+                } break;
+                case ENET_EVENT_TYPE_DISCONNECT: {
+                    ALOGI("ENet disconnected.");
                     disconnected = true;
-                    break;
+                } break;
             }
         }
 
-        // Drop connection, since disconnection didn't succeed
+        // Drop connection, since disconnection didn't succeed.
         if (!disconnected) {
             enet_peer_reset(conn->peer);
         }
@@ -448,6 +450,55 @@ void my_connection_set_pipeline(MyConnection *conn, GstPipeline *pipeline) {
     //    conn_update_status(conn, MY_STATUS_NEGOTIATING);
 }
 
+void handle_enet_event(ENetEvent *event) {
+    switch (event->type) {
+        case ENET_EVENT_TYPE_RECEIVE: {
+            ALOGI("ENet received a packet.");
+        } break;
+        case ENET_EVENT_TYPE_DISCONNECT: {
+            ALOGI("ENet disconnected.");
+        } break;
+        case ENET_EVENT_TYPE_NONE: {
+            ALOGI("ENet none event.");
+        } break;
+        case ENET_EVENT_TYPE_CONNECT: {
+            ALOGI("ENet connected.");
+        } break;
+        case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT: {
+            ALOGI("ENet disconnect timeout.");
+        } break;
+    }
+}
+
+static void *enet_thread_func(void *ptr) {
+    MyConnection *conn = ptr;
+
+    ENetEvent event = {0};
+
+    bool running = true;
+
+    while (1) {
+        if (!conn->client) {
+            continue;
+        }
+
+        while (running) {
+            // Block for up to 10 milliseconds, or until an event occurs
+            if (enet_host_service(conn->client, &event, 10) > 0) {
+                // Handle the event
+                handle_enet_event(&event);
+
+                // Check for more events that might have arrived quickly
+                while (enet_host_service(conn->client, &event, 0) > 0) {
+                    handle_enet_event(&event);
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
 static void conn_connect_internal(MyConnection *conn, enum my_status status) {
     my_connection_disconnect(conn);
     if (!conn->ws_cancel) {
@@ -495,19 +546,9 @@ static void conn_connect_internal(MyConnection *conn, enum my_status status) {
         }
         conn->peer = peer;
 
-        ENetEvent event = {0};
-
-        /* Wait up to 5 seconds for the connection attempt to succeed. */
-        if (enet_host_service(client, &event, 5000) > 0 && event.type == ENET_EVENT_TYPE_CONNECT) {
-            ALOGI("Connection to enet server succeeded.");
-        } else {
-            /* Either the 5 seconds are up or a disconnect event was */
-            /* received. Reset the peer in the event the 5 seconds   */
-            /* had run out without any significant event.            */
-            enet_peer_reset(peer);
-            ALOGE("Connection to enet server failed.");
-            exit(EXIT_FAILURE);
-        }
+        int ret = os_thread_helper_start(&conn->enet_thread, &enet_thread_func, conn);
+        (void)ret;
+        g_assert(ret == 0);
     }
 }
 
@@ -519,11 +560,19 @@ MyConnection *my_connection_new(const gchar *websocket_uri) {
         abort();
     }
 
-    return MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, "websocket-uri", websocket_uri, NULL));
+    MyConnection *conn = MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, "websocket-uri", websocket_uri, NULL));
+
+    g_assert(os_thread_helper_init(&conn->enet_thread) >= 0);
+
+    return conn;
 }
 
 MyConnection *my_connection_new_localhost() {
-    return MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, NULL));
+    MyConnection *conn = MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, NULL));
+
+    g_assert(os_thread_helper_init(&conn->enet_thread) >= 0);
+
+    return conn;
 }
 
 void my_connection_connect(MyConnection *conn) {

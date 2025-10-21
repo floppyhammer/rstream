@@ -2,6 +2,7 @@ add_library(
         gst_stream_app SHARED
         stream_app.c
         connection.c
+        thread.c
         render/GLDebug.cpp
         render/GLError.cpp
         render/GLSwapchain.cpp

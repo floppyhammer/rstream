@@ -330,9 +330,9 @@ fn handle_text_message(msg: Message) {
         Ok(msg) => {
             let input_type = InputType::try_from(msg.input_type).unwrap();
 
-            println!("Received message type: {:?}", msg.msg_type);
-            println!("Received input type: {:?}", input_type);
-            println!("Received input position: {:?}, {:?}", msg.x, msg.y);
+            // println!("Received message type: {:?}", msg.msg_type);
+            // println!("Received input type: {:?}", input_type);
+            // println!("Received input position: {:?}, {:?}", msg.x, msg.y);
 
             match input_type {
                 InputType::CursorLeftDown => {
@@ -483,8 +483,8 @@ fn handle_enet_packet(packet: &enet::Packet) {
     let x: f32 = f32::from_bits(command.data0);
     let y: f32 = f32::from_bits(command.data1);
 
-    println!("Received input type: {:?}", command.input_type);
-    println!("Received input position: {:?}, {:?}", x, y);
+    // println!("Received input type: {:?}", command.input_type);
+    // println!("Received input position: {:?}, {:?}", x, y);
 
     let input_type = InputType::try_from(command.input_type).unwrap();
 
@@ -504,8 +504,15 @@ fn handle_enet_packet(packet: &enet::Packet) {
             enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
         }
         InputType::CursorScroll => {
+            if x.abs() > 0.1 {
+                enigo
+                    .scroll((-x / 10.0) as i32, enigo::Axis::Horizontal)
+                    .unwrap();
+            }
             if y.abs() > 0.1 {
-                enigo.scroll(-y as i32, enigo::Axis::Vertical).unwrap();
+                enigo
+                    .scroll((-y / 10.0) as i32, enigo::Axis::Vertical)
+                    .unwrap();
             }
         }
         InputType::CursorLeftClick => {
@@ -544,11 +551,9 @@ async fn run_enet_server() -> Result<(), IoError> {
                     enet::Event::Connect { peer, .. } => {
                         println!("ENet peer {} connected", peer.id().0);
                     }
-
                     enet::Event::Disconnect { peer, .. } => {
                         println!("ENet peer {} disconnected", peer.id().0);
                     }
-
                     enet::Event::Receive {
                         peer,
                         channel_id,
