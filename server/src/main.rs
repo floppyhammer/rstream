@@ -122,7 +122,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
     let pipeline_str = format!(
         "rtpbin name=rtpbin \
         d3d11screencapturesrc show-cursor=true ! videoconvert ! queue ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=50000 key-int-max=120 ! \
+        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! \
         video/x-h264,profile=main ! rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
         rtpbin.send_rtp_sink_0 \

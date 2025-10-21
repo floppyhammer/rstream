@@ -15,6 +15,12 @@ import android.view.WindowManager
 
 class StreamingActivity : NativeActivity() {
     override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
+        volumeControlStream = AudioManager.STREAM_MUSIC
+
+        super.onCreate(savedInstanceState, persistentState)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         window.decorView.setSystemUiVisibility(
@@ -23,14 +29,12 @@ class StreamingActivity : NativeActivity() {
                     or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
                     or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                     or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE)
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
         )
 
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
 
-        volumeControlStream = AudioManager.STREAM_MUSIC
-
-        super.onCreate(savedInstanceState, persistentState)
+        super.onWindowFocusChanged(hasFocus)
     }
 
     companion object {
