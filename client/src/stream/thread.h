@@ -35,3 +35,11 @@ int os_thread_helper_start(struct os_thread_helper *oth, os_run_func_t func, voi
  * @public @memberof os_thread_helper
  */
 int os_thread_helper_init(struct os_thread_helper *oth);
+
+/**
+ * Signals a thread to stop and waits for it to exit.
+ *
+ * @param oth Pointer to the os_thread_helper struct.
+ * @return 0 on success, or an error code.
+ */
+int os_thread_helper_stop(struct os_thread_helper *oth);

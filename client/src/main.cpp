@@ -147,9 +147,9 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
     }
 
     // Do not handle edge actions.
-//    if (AMotionEvent_getEdgeFlags(event) != AMOTION_EVENT_EDGE_FLAG_NONE) {
-//        return 1;
-//    }
+    //    if (AMotionEvent_getEdgeFlags(event) != AMOTION_EVENT_EDGE_FLAG_NONE) {
+    //        return 1;
+    //    }
 
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         int32_t source = AInputEvent_getSource(event);
@@ -391,7 +391,10 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
         } break;
         case APP_CMD_TERM_WINDOW: {
             ALOGI("APP_CMD_TERM_WINDOW");
+
             stream_app_stop(state_.stream_app);
+
+            stream_app_destroy(&state_.stream_app);
 
             my_connection_disconnect(state_.connection);
 

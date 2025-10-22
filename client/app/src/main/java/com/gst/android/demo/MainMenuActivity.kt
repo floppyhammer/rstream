@@ -14,7 +14,7 @@ class MainMenuActivity : AppCompatActivity() {
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main_menu)
 
         // Set up the button click listener
-        binding.button.setOnClickListener {
+        binding.connectButton.setOnClickListener {
             // Create an Intent to switch to the StreamingActivity
             val intent = Intent(this, StreamingActivity::class.java)
 

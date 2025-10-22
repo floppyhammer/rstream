@@ -136,7 +136,10 @@ static void stream_app_dispose(StreamApp *self) {
     // Stop things and clear ref counted things here.
     // StreamApp *self = stream_app(object);
     stream_app_stop(self);
+
+    g_main_loop_quit(self->loop);
     g_clear_object(&self->loop);
+
     gst_clear_object(&self->sample);
     gst_clear_object(&self->pipeline);
     gst_clear_object(&self->gst_gl_display);
@@ -439,6 +442,7 @@ void stream_app_destroy(StreamApp **ptr_app) {
     if (app == NULL) {
         return;
     }
+
     stream_app_dispose(app);
     stream_app_finalize(app);
     free(app);

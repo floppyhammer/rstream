@@ -52,3 +52,27 @@ int os_thread_helper_init(struct os_thread_helper *oth) {
 
     return 0;
 }
+
+int os_thread_helper_stop(struct os_thread_helper *oth) {
+    pthread_mutex_lock(&oth->mutex);
+
+    // If the thread isn't running, there's nothing to do.
+    if (!oth->running) {
+        pthread_mutex_unlock(&oth->mutex);
+        return 0;
+    }
+
+    // Signal the thread to stop.
+    oth->running = false;
+
+    // The thread might be waiting on this condition variable.
+    // Broadcasting wakes it up so it can check the `running` flag and exit.
+    pthread_cond_broadcast(&oth->cond);
+
+    pthread_mutex_unlock(&oth->mutex);
+
+    // Wait for the thread to finish execution.
+    int ret = pthread_join(oth->thread, NULL);
+
+    return ret;
+}

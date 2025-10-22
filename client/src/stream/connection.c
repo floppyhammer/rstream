@@ -341,6 +341,8 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
             enet_peer_reset(conn->peer);
         }
 
+        os_thread_helper_stop(&conn->enet_thread);
+
         enet_host_destroy(conn->client);
         enet_deinitialize();
     }
@@ -475,9 +477,7 @@ static void *enet_thread_func(void *ptr) {
 
     ENetEvent event = {0};
 
-    bool running = true;
-
-    while (running) {
+    while (conn->enet_thread.running) {
         if (!conn->client) {
             continue;
         }
