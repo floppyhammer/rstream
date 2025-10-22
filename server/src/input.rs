@@ -7,6 +7,7 @@ use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Button, Mouse};
 use rusty_enet as enet;
+use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::io::Error as IoError;
 use std::net::{SocketAddr, UdpSocket};
@@ -100,8 +101,6 @@ fn read_command_from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<InputCommand, 
         data1,
     })
 }
-
-use serde::{Deserialize, Serialize};
 
 // Define a simple structure for the input events we expect via WebSocket
 #[derive(Debug, Serialize, Deserialize)]

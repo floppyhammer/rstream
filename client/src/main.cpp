@@ -46,6 +46,7 @@ struct MyState {
     float press_pos_y;
     float prev_pos_x;
     float prev_pos_y;
+    bool scrolling;
 
     std::optional<int64_t> press_time;
 
@@ -239,6 +240,8 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                                                    dy);
                     state_.prev_pos_x = client_x;
                     state_.prev_pos_y = client_y;
+
+                    state_.scrolling = true;
                 } else {
                     ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
                     my_connection_send_input_event(state_.connection,
@@ -255,6 +258,11 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 break;
             case AMOTION_EVENT_ACTION_UP:
                 ALOGI("INPUT: UP (%.1f, %.1f)", client_x, client_y);
+
+                if (state_.scrolling) {
+                    state_.scrolling = false;
+                    break;
+                }
 
                 bool right_click = false;
                 if (state_.press_time.has_value()) {

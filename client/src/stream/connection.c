@@ -477,21 +477,19 @@ static void *enet_thread_func(void *ptr) {
 
     bool running = true;
 
-    while (1) {
+    while (running) {
         if (!conn->client) {
             continue;
         }
 
-        while (running) {
-            // Block for up to 10 milliseconds, or until an event occurs
-            if (enet_host_service(conn->client, &event, 10) > 0) {
-                // Handle the event
-                handle_enet_event(&event);
+        // Block for up to 10 milliseconds, or until an event occurs
+        if (enet_host_service(conn->client, &event, 10) > 0) {
+            // Handle the event
+            handle_enet_event(&event);
 
-                // Check for more events that might have arrived quickly
-                while (enet_host_service(conn->client, &event, 0) > 0) {
-                    handle_enet_event(&event);
-                }
+            // Check for more events that might have arrived quickly
+            while (enet_host_service(conn->client, &event, 0) > 0) {
+                handle_enet_event(&event);
             }
         }
     }
