@@ -1,6 +1,6 @@
 use crate::gui::config::{BuildType, Config};
-use crate::input::run_enet_server;
-use crate::stream::{init_enigo, init_vigem, run_ws};
+use crate::input::{init_enigo, init_vigem, run_enet_server};
+use crate::stream::run_websocket;
 use async_std::task;
 use chrono;
 use eframe::egui;
@@ -75,7 +75,7 @@ impl Default for App {
 
         init_vigem();
 
-        let ws_handle = task::spawn(run_ws());
+        let ws_handle = task::spawn(run_websocket(5600));
 
         let enet_handle = task::spawn(run_enet_server());
 

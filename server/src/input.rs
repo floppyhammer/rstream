@@ -1,20 +1,67 @@
-use crate::stream::ENIGO_GUARD;
-
 use async_std::task;
-use async_tungstenite::tungstenite::Message;
 use byteorder::{LittleEndian, ReadBytesExt};
 use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
-use enigo::{Button, Mouse};
+use enigo::{Button, Enigo, Mouse, Settings};
 use rusty_enet as enet;
 use std::io::Cursor;
 use std::io::Error as IoError;
 use std::net::{SocketAddr, UdpSocket};
 use std::str::FromStr;
+use std::sync::{Mutex, Once};
+use vigem_client::{self as vigem, Client, TargetId, XButtons, XGamepad, Xbox360Wired};
 
 // --- ENet Configuration ---
 const ENET_PORT: u16 = 7777; // Dedicated ENet port for input
 const ENET_CHANNEL_INPUT: u8 = 0; // Channel 0 for reliable input commands
+
+// A thread-safe global container for the Enigo instance.
+// Mutex: Ensures exclusive access when a thread is using Enigo.
+// Option: Allows Enigo to be initialized later (Lazy initialization).
+pub(crate) static ENIGO_GUARD: Mutex<Option<Enigo>> = Mutex::new(None);
+static ENIGO_INIT: Once = Once::new();
+
+static VIGEM_GUARD: Mutex<Option<Xbox360Wired<Client>>> = Mutex::new(None);
+static GAMEPAD_GUARD: Mutex<Option<XGamepad>> = Mutex::new(None);
+static VIGEM_INIT: Once = Once::new();
+
+// A function to initialize Enigo exactly once.
+pub fn init_enigo() {
+    ENIGO_INIT.call_once(|| {
+        let enigo = Enigo::new(&Settings::default()).expect("Failed to initialize Enigo");
+        *ENIGO_GUARD.lock().unwrap() = Some(enigo);
+        println!("Enigo initialized.");
+    });
+}
+
+pub fn init_vigem() {
+    VIGEM_INIT.call_once(|| {
+        // 1. Connect to the ViGEmBus driver service
+        let client = vigem::Client::connect().unwrap();
+        println!("Vigem initialized.");
+
+        // 2. Create the virtual controller target (Xbox 360 Wired)
+        let id = TargetId::XBOX360_WIRED;
+        let mut target = vigem::Xbox360Wired::new(client, id);
+
+        // 3. Plug in the virtual controller
+        println!("Plugging in virtual Xbox 360 controller...");
+        target.plugin().unwrap();
+
+        // 4. Wait for the virtual controller to be ready to accept updates
+        println!("Waiting for controller to be ready...");
+        target.wait_ready().unwrap();
+
+        *VIGEM_GUARD.lock().unwrap() = Some(target);
+
+        let gamepad = XGamepad {
+            ..Default::default()
+        };
+        *GAMEPAD_GUARD.lock().unwrap() = Some(gamepad);
+
+        println!("Controller is ready.");
+    });
+}
 
 // Function to start the ENet server host
 fn start_enet_server() -> enet::Host<UdpSocket> {
@@ -147,16 +194,16 @@ fn handle_enet_packet(packet: &enet::Packet) {
         return;
     }
 
-    println!("Received packet data: {:?}", packet_data);
+    // println!("Received packet data: {:?}", packet_data);
 
-    // 2. Perform the UNSAFE cast. This is only safe because we enforced
-    //    #[repr(C, packed)] and checked the size.
-    let command: InputCommand = unsafe {
-        // Create a raw pointer to the packet data
-        let ptr = packet_data.as_ptr() as *const InputCommand;
-        // Dereference the pointer to get the struct
-        ptr.read_unaligned()
-    };
+    // // 2. Perform the UNSAFE cast. This is only safe because we enforced
+    // //    #[repr(C, packed)] and checked the size.
+    // let command: InputCommand = unsafe {
+    //     // Create a raw pointer to the packet data
+    //     let ptr = packet_data.as_ptr() as *const InputCommand;
+    //     // Dereference the pointer to get the struct
+    //     ptr.read_unaligned()
+    // };
 
     // 1. Wrap the packet data in a Cursor for sequential reading
     let mut cursor = Cursor::new(packet_data);
@@ -165,7 +212,7 @@ fn handle_enet_packet(packet: &enet::Packet) {
     let command = match read_command_from_cursor(&mut cursor) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Failed to deserialize packet with byteorder: {}", e);
+            eprintln!("Failed to deserialize packet with byte order: {}", e);
             return;
         }
     };

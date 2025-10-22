@@ -1,11 +1,9 @@
 use gst::prelude::*;
 use gstreamer as gst;
 
-use crate::input::run_enet_server;
 use async_std::net::{TcpListener, TcpStream};
 use async_std::task;
 use async_tungstenite::tungstenite::protocol::Message;
-use enigo::{Enigo, Keyboard, Mouse, Settings};
 use futures::prelude::*;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
@@ -13,28 +11,16 @@ use futures::{
 };
 use std::{
     collections::HashMap,
-    env,
     io::Error as IoError,
     net::SocketAddr,
     sync::{Arc, Mutex, Once},
 };
-use vigem_client::{self as vigem, Client, TargetId, XButtons, XGamepad, Xbox360Wired};
 
 // --- FIXED: Use a thread-safe Mutex for the global pipeline ---
 // The `Mutex` provides safe, exclusive access to the GStreamer pipeline.
 // `Option<gst::Pipeline>` allows the pipeline to be present or absent (Null state).
 static PIPELINE_GUARD: Mutex<Option<gst::Pipeline>> = Mutex::new(None);
 static PIPELINE_INIT: Once = Once::new();
-
-// A thread-safe global container for the Enigo instance.
-// Mutex: Ensures exclusive access when a thread is using Enigo.
-// Option: Allows Enigo to be initialized later (Lazy initialization).
-pub(crate) static ENIGO_GUARD: Mutex<Option<Enigo>> = Mutex::new(None);
-static ENIGO_INIT: Once = Once::new();
-
-static VIGEM_GUARD: Mutex<Option<Xbox360Wired<Client>>> = Mutex::new(None);
-static GAMEPAD_GUARD: Mutex<Option<XGamepad>> = Mutex::new(None);
-static VIGEM_INIT: Once = Once::new();
 
 // We'll keep the GstPipelineControl for single-start logic
 type GstPipelineControl = Arc<Once>;
@@ -52,45 +38,6 @@ fn init_gstreamer() {
         gst::init().unwrap();
         println!("GStreamer initialized.");
         gst::log::set_default_threshold(gst::DebugLevel::Info);
-    });
-}
-
-// A function to initialize Enigo exactly once.
-pub fn init_enigo() {
-    ENIGO_INIT.call_once(|| {
-        let enigo = Enigo::new(&Settings::default()).expect("Failed to initialize Enigo");
-        *ENIGO_GUARD.lock().unwrap() = Some(enigo);
-        println!("Enigo initialized.");
-    });
-}
-
-pub fn init_vigem() {
-    VIGEM_INIT.call_once(|| {
-        // 1. Connect to the ViGEmBus driver service
-        let client = vigem::Client::connect().unwrap();
-
-        println!("Vigem initialized.");
-
-        // 2. Create the virtual controller target (Xbox 360 Wired)
-        let id = TargetId::XBOX360_WIRED;
-        let mut target = vigem::Xbox360Wired::new(client, id);
-
-        // 3. Plug in the virtual controller
-        println!("Plugging in virtual Xbox 360 controller...");
-        target.plugin().unwrap();
-
-        // 4. Wait for the virtual controller to be ready to accept updates
-        println!("Waiting for controller to be ready...");
-        target.wait_ready().unwrap();
-
-        *VIGEM_GUARD.lock().unwrap() = Some(target);
-
-        let mut gamepad = XGamepad {
-            ..Default::default()
-        };
-        *GAMEPAD_GUARD.lock().unwrap() = Some(gamepad);
-
-        println!("Controller is ready.");
     });
 }
 
@@ -163,7 +110,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
 }
 
 pub fn stop_gstreamer_pipeline() {
-    // Acquire the lock for the global pipeline state
+    // Acquire the lock for the global pipeline state.
     let mut guard = PIPELINE_GUARD.lock().unwrap();
 
     // Use `Option::take()` to extract the pipeline and replace the value with None.
@@ -219,7 +166,7 @@ async fn handle_connection(
             // Handle the incoming message/command
             if msg.is_text() {
                 let text_msg = msg.clone();
-                // handle_text_message(text_msg);
+                handle_text_message(text_msg);
             }
 
             let peers = peer_map.lock().unwrap();
@@ -254,10 +201,8 @@ async fn handle_connection(
     }
 }
 
-pub async fn run_ws() -> Result<(), IoError> {
-    let addr = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "0.0.0.0:5600".to_string());
+pub async fn run_websocket(port: u32) -> Result<(), IoError> {
+    let addr = format!("0.0.0.0:{}", port);
 
     let state = PeerMap::new(Mutex::new(HashMap::new()));
     let gst_control = GstPipelineControl::new(Once::new());
@@ -276,4 +221,14 @@ pub async fn run_ws() -> Result<(), IoError> {
     }
 
     Ok(())
+}
+
+// Video control via WebSocket.
+fn handle_text_message(msg: Message) {
+    if !msg.is_text() {
+        return;
+    }
+
+    let text = msg.to_text().expect("Failed to get text from message");
+    println!("Received command: {}", text);
 }
