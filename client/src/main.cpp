@@ -128,15 +128,28 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
 
 // Example input handler function
 int32_t handle_input(struct android_app *app, AInputEvent *event) {
+    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_KEY) {
+        int32_t key_code = AKeyEvent_getKeyCode(event);
+        if (key_code == AKEYCODE_BACK && AKeyEvent_getAction(event) == AKEY_EVENT_ACTION_UP) {
+            // The back button was released.
+            // By default, the system will finish the activity.
+            // You could add custom logic here, like showing a confirmation dialog.
+            // If you handle the event and don't want the activity to close, return 1.
+            // Otherwise, return 0 to let the system handle it (which closes the activity).
+
+            return 0;
+        }
+    }
+
     int res = handle_gamepad_key_event(event);
     if (res) {
-        return 1;
+        return 0;
     }
 
     // Do not handle edge actions.
-    if (AMotionEvent_getEdgeFlags(event) != AMOTION_EVENT_EDGE_FLAG_NONE) {
-        return 1;
-    }
+//    if (AMotionEvent_getEdgeFlags(event) != AMOTION_EVENT_EDGE_FLAG_NONE) {
+//        return 1;
+//    }
 
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         int32_t source = AInputEvent_getSource(event);
@@ -303,7 +316,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 //                    }
                 break;
         }
-        return 1; // Event handled
+        return 0; // Event handled
     }
     return 0; // Event not handled
 }
@@ -428,6 +441,16 @@ bool poll_events(struct android_app *app) {
 } // namespace
 
 struct MySample *prev_sample;
+
+// This function might be called when the user presses a back button in your native UI,
+// or when the stream ends.
+void return_to_main_menu(struct android_app *app) {
+    __android_log_print(ANDROID_LOG_INFO, "NativeApp", "Finishing native activity to return to main menu.");
+
+    // This function signals the Android system to destroy and finish the current NativeActivity.
+    // The user will be returned to the previous activity in the back stack (MainMenuActivity).
+    ANativeActivity_finish(app->activity);
+}
 
 void android_main(struct android_app *app) {
     JNIEnv *env = nullptr;
