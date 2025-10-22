@@ -1,4 +1,4 @@
-use crate::ENIGO_GUARD;
+use crate::stream::ENIGO_GUARD;
 
 use async_std::task;
 use async_tungstenite::tungstenite::Message;
@@ -7,7 +7,6 @@ use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
 use enigo::{Button, Mouse};
 use rusty_enet as enet;
-use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 use std::io::Error as IoError;
 use std::net::{SocketAddr, UdpSocket};
@@ -100,19 +99,6 @@ fn read_command_from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<InputCommand, 
         data0,
         data1,
     })
-}
-
-// Define a simple structure for the input events we expect via WebSocket
-#[derive(Debug, Serialize, Deserialize)]
-pub struct InputMessage {
-    #[serde(rename = "msg-type")]
-    pub msg_type: String,
-
-    #[serde(rename = "input-type")]
-    pub input_type: u8,
-
-    pub x: f64, // Floating-point number for coordinates
-    pub y: f64,
 }
 
 #[repr(u8)]
@@ -238,69 +224,6 @@ fn handle_enet_packet(packet: &enet::Packet) {
         InputType::GamepadRightStick => {
             // Gamepad logic needs to be implemented here
             println!("Gamepad Right Stick ({}, {})", x, y);
-        }
-    }
-}
-
-fn handle_text_message(msg: Message) {
-    if !msg.is_text() {
-        return;
-    }
-
-    let text = msg.to_text().expect("Failed to get text from message");
-    // println!("Received command: {}", text);
-
-    let mut enigo_lock = ENIGO_GUARD.lock().unwrap();
-    let enigo = enigo_lock.as_mut().expect("Enigo was not initialized!");
-
-    match serde_json::from_str::<InputMessage>(text) {
-        Ok(msg) => {
-            let input_type = InputType::try_from(msg.input_type).unwrap();
-
-            // println!("Received message type: {:?}", msg.msg_type);
-            // println!("Received input type: {:?}", input_type);
-            // println!("Received input position: {:?}, {:?}", msg.x, msg.y);
-
-            match input_type {
-                InputType::CursorLeftDown => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                    enigo.button(Button::Left, Press).unwrap();
-                }
-                InputType::CursorLeftUp => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                    enigo.button(Button::Left, Release).unwrap();
-                }
-                InputType::CursorMove => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                }
-                InputType::CursorScroll => {
-                    if msg.y.abs() > 0.1 {
-                        enigo.scroll(-msg.y as i32, enigo::Axis::Vertical).unwrap();
-                    }
-                }
-                InputType::CursorLeftClick => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                }
-                InputType::CursorRightClick => {
-                    enigo.move_mouse(msg.x as i32, msg.y as i32, Abs).unwrap();
-                    enigo.button(Button::Right, Click).unwrap();
-                }
-                InputType::GamepadButtonX => {
-                    println!("Gamepad Button X");
-                }
-                InputType::GamepadLeftStick => {
-                    println!("Gamepad Left Stick ({}, {})", msg.x, msg.y);
-                }
-                InputType::GamepadRightStick => {
-                    println!("Gamepad Right Stick ({}, {})", msg.x, msg.y);
-                }
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "Failed to parse command JSON: {}. Original message: {}",
-                e, text
-            );
         }
     }
 }

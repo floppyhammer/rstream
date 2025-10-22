@@ -1,302 +1,97 @@
+// #![forbid(unsafe_code)]
+#![cfg_attr(not(debug_assertions), deny(warnings))] // Forbid warnings in release builds
+#![warn(clippy::all, rust_2018_idioms)]
+// Hide the console window.
+// #![windows_subsystem = "windows"]
+
+mod gui;
+mod stream;
 mod input;
 
-use gst::prelude::*;
-use gstreamer as gst;
+use eframe::egui::{Style, Visuals};
+use std::sync::Mutex;
+use tray_icon::{Icon, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOWDEFAULT};
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
-use crate::input::run_enet_server;
-use async_std::net::{TcpListener, TcpStream};
-use async_std::task;
-use async_tungstenite::tungstenite::protocol::Message;
-use enigo::{Enigo, Keyboard, Mouse, Settings};
-use futures::prelude::*;
-use futures::{
-    channel::mpsc::{UnboundedSender, unbounded},
-    future, pin_mut,
-};
-use std::{
-    collections::HashMap,
-    env,
-    io::Error as IoError,
-    net::SocketAddr,
-    sync::{Arc, Mutex, Once},
-};
-use vigem_client::{self as vigem, Client, TargetId, XButtons, XGamepad, Xbox360Wired};
+#[allow(dead_code)]
+const NAME: &str = env!("CARGO_PKG_NAME");
+#[allow(dead_code)]
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-// --- FIXED: Use a thread-safe Mutex for the global pipeline ---
-// The `Mutex` provides safe, exclusive access to the GStreamer pipeline.
-// `Option<gst::Pipeline>` allows the pipeline to be present or absent (Null state).
-static PIPELINE_GUARD: Mutex<Option<gst::Pipeline>> = Mutex::new(None);
-static PIPELINE_INIT: Once = Once::new();
+static VISIBLE: Mutex<bool> = Mutex::new(true);
 
-// A thread-safe global container for the Enigo instance.
-// Mutex: Ensures exclusive access when a thread is using Enigo.
-// Option: Allows Enigo to be initialized later (Lazy initialization).
-static ENIGO_GUARD: Mutex<Option<Enigo>> = Mutex::new(None);
-static ENIGO_INIT: Once = Once::new();
-
-static VIGEM_GUARD: Mutex<Option<Xbox360Wired<Client>>> = Mutex::new(None);
-static GAMEPAD_GUARD: Mutex<Option<XGamepad>> = Mutex::new(None);
-static VIGEM_INIT: Once = Once::new();
-
-// We'll keep the GstPipelineControl for single-start logic
-type GstPipelineControl = Arc<Once>;
-
-type Tx = UnboundedSender<Message>;
-type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
-
-// ----------------------------------------------------------------------
-// --- GStreamer Functions (Now Thread-Safe) ----------------------------
-// ----------------------------------------------------------------------
-
-fn init_gstreamer() {
-    // This function will initialize GStreamer only once.
-    PIPELINE_INIT.call_once(|| {
-        gst::init().unwrap();
-        println!("GStreamer initialized.");
-        gst::log::set_default_threshold(gst::DebugLevel::Info);
-    });
-}
-
-// A function to initialize Enigo exactly once.
-fn init_enigo() {
-    ENIGO_INIT.call_once(|| {
-        let enigo = Enigo::new(&Settings::default()).expect("Failed to initialize Enigo");
-        *ENIGO_GUARD.lock().unwrap() = Some(enigo);
-        println!("Enigo initialized.");
-    });
-}
-
-fn init_vigem() {
-    VIGEM_INIT.call_once(|| {
-        // 1. Connect to the ViGEmBus driver service
-        let client = vigem::Client::connect().unwrap();
-
-        println!("Vigem initialized.");
-
-        // 2. Create the virtual controller target (Xbox 360 Wired)
-        let id = TargetId::XBOX360_WIRED;
-        let mut target = vigem::Xbox360Wired::new(client, id);
-
-        // 3. Plug in the virtual controller
-        println!("Plugging in virtual Xbox 360 controller...");
-        target.plugin().unwrap();
-
-        // 4. Wait for the virtual controller to be ready to accept updates
-        println!("Waiting for controller to be ready...");
-        target.wait_ready().unwrap();
-
-        *VIGEM_GUARD.lock().unwrap() = Some(target);
-
-        let mut gamepad = XGamepad {
-            ..Default::default()
-        };
-        *GAMEPAD_GUARD.lock().unwrap() = Some(gamepad);
-
-        println!("Controller is ready.");
-    });
-}
-
-fn start_gstreamer_pipeline(addr: SocketAddr) {
-    // Acquire the lock for the global pipeline state
-    let mut guard = PIPELINE_GUARD.lock().unwrap();
-
-    // Check if a pipeline is already running
-    if guard.is_some() {
-        println!("Pipeline already running. Not restarting.");
-        return;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut icon_data: Vec<u8> = Vec::with_capacity(16 * 16 * 4);
+    for _ in 0..256 {
+        // all red
+        icon_data.extend_from_slice(&[255, 0, 0, 255]);
     }
+    let icon = Icon::from_rgba(icon_data, 16, 16)?;
+    let _tray_icon = TrayIconBuilder::new()
+        .with_icon(icon)
+        .with_tooltip("My App")
+        .build()?;
 
-    let host = addr.ip().to_string();
+    let app = gui::app::App::default();
 
-    let pipeline_str = format!(
-        "rtpbin name=rtpbin \
-        d3d11screencapturesrc show-cursor=true ! videoconvert ! queue ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! \
-        video/x-h264,profile=main ! rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
-        application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
-        rtpbin.send_rtp_sink_0 \
-        rtpbin. ! \
-        udpsink host={} port=5601 sync=false \
-        wasapi2src loopback=true low-latency=true ! \
-        queue ! \
-        audioconvert ! \
-        audioresample ! \
-        queue ! \
-        opusenc perfect-timestamp=false ! \
-        rtpopuspay ! \
-        application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
-        rtpbin.send_rtp_sink_1 \
-        rtpbin. ! \
-        udpsink host={} port=5602 sync=false",
-        host, host
+    let native_options = eframe::NativeOptions {
+        viewport: eframe::egui::ViewportBuilder::default()
+            .with_position([200.0, 200.0])
+            .with_inner_size([640.0, 480.0])
+            .with_drag_and_drop(true),
+        ..Default::default()
+    };
+
+    let _ = eframe::run_native(
+        format!("{} - {}", "RStream Server", VERSION).as_str(),
+        native_options,
+        Box::new(|cc| {
+            let style = Style {
+                visuals: Visuals::dark(),
+                ..Style::default()
+            };
+            cc.egui_ctx.set_style(style);
+
+            let RawWindowHandle::Win32(handle) = cc.window_handle().unwrap().as_raw() else {
+                panic!("Unsupported platform");
+            };
+
+            // let context = cc.egui_ctx.clone();
+
+            TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
+                // println!("TrayIconEvent: {:?}", event);
+
+                match event {
+                    TrayIconEvent::Click {
+                        button_state: MouseButtonState::Down,
+                        ..
+                    } => {
+                        let mut visible = VISIBLE.lock().unwrap();
+
+                        if *visible {
+                            let window_handle = HWND(handle.hwnd.into());
+                            unsafe {
+                                ShowWindow(window_handle, SW_HIDE);
+                            }
+                            *visible = false;
+                        } else {
+                            let window_handle = HWND(handle.hwnd.into());
+                            unsafe {
+                                ShowWindow(window_handle, SW_SHOWDEFAULT);
+                            }
+                            *visible = true;
+                        }
+
+                        // context.request_repaint();
+                    }
+                    _ => return,
+                }
+            }));
+
+            Box::new(app)
+        }),
     );
-
-    println!("Attempting to start pipeline to: {}...", addr);
-
-    let mut context = gst::ParseContext::new();
-
-    let pipeline = match gst::parse::launch_full(
-        &pipeline_str,
-        Some(&mut context),
-        gst::ParseFlags::empty(),
-    ) {
-        Ok(pipeline) => pipeline,
-        Err(err) => {
-            if let Some(gst::ParseError::NoSuchElement) = err.kind::<gst::ParseError>() {
-                eprintln!("Missing element(s): {:?}", context.missing_elements());
-            } else {
-                eprintln!("Failed to parse pipeline: {err}");
-            }
-            return;
-        }
-    };
-
-    let pipeline = pipeline.downcast::<gst::Pipeline>().unwrap();
-
-    // Store the running pipeline in the global Mutex
-    *guard = Some(pipeline.clone());
-
-    // Set pipeline to playing
-    if let Err(e) = pipeline.set_state(gst::State::Playing) {
-        eprintln!("Failed to set pipeline to Playing: {}", e);
-    } else {
-        println!("Pipeline started playing to {}!", addr);
-    }
-}
-
-fn stop_gstreamer_pipeline() {
-    // Acquire the lock for the global pipeline state
-    let mut guard = PIPELINE_GUARD.lock().unwrap();
-
-    // Use `Option::take()` to extract the pipeline and replace the value with None.
-    // The extracted pipeline reference will then be dropped when it goes out of scope.
-    if let Some(pipeline) = guard.take() {
-        println!("Stopping pipeline.");
-        pipeline
-            .set_state(gst::State::Null)
-            .expect("Unable to set the pipeline to the `Null` state");
-        println!("Pipeline stopped.");
-    }
-    // The lock is automatically released when `guard` goes out of scope.
-}
-
-// ----------------------------------------------------------------------
-// --- Asynchronous WebSocket Functions ---------------------------------
-// ----------------------------------------------------------------------
-
-async fn handle_connection(
-    peer_map: PeerMap,
-    raw_stream: TcpStream,
-    addr: SocketAddr,
-    start_once: GstPipelineControl,
-) {
-    println!("Incoming TCP connection from: {}", addr);
-
-    let ws_stream = async_tungstenite::accept_async(raw_stream)
-        .await
-        .expect("Error during the websocket handshake occurred");
-    println!("WebSocket connection established: {}", addr);
-
-    // --- LOGIC: Start Pipeline on First Connection ---
-    let start_pipe = move || {
-        init_gstreamer();
-    };
-    start_once.call_once(start_pipe);
-    // ---------------------------------------------------
-
-    // Spawn a task to run the blocking pipeline start function
-    task::spawn_blocking(move || {
-        start_gstreamer_pipeline(addr);
-    });
-
-    // Insert the write part of this peer to the peer map.
-    let (tx, rx) = unbounded();
-    peer_map.lock().unwrap().insert(addr, tx);
-
-    let (outgoing, incoming) = ws_stream.split();
-
-    let broadcast_incoming = incoming
-        .try_filter(|msg| future::ready(!msg.is_close()))
-        .try_for_each(|msg| {
-            // Handle the incoming message/command
-            if msg.is_text() {
-                let text_msg = msg.clone();
-                // handle_text_message(text_msg);
-            }
-
-            let peers = peer_map.lock().unwrap();
-            let broadcast_recipients = peers
-                .iter()
-                .filter(|(peer_addr, _)| peer_addr != &&addr)
-                .map(|(_, ws_sink)| ws_sink);
-
-            for recp in broadcast_recipients {
-                recp.unbounded_send(msg.clone()).unwrap();
-            }
-
-            future::ok(())
-        });
-
-    let receive_from_others = rx.map(Ok).forward(outgoing);
-
-    pin_mut!(broadcast_incoming, receive_from_others);
-    future::select(broadcast_incoming, receive_from_others).await;
-
-    println!("{} disconnected", &addr);
-    peer_map.lock().unwrap().remove(&addr);
-
-    // Stop Pipeline if this was the last client
-    if peer_map.lock().unwrap().is_empty() {
-        // Spawn a task to run the blocking pipeline stop function
-        task::spawn_blocking(stop_gstreamer_pipeline);
-        // Reset the Once flag so the stream can be started again next time
-        // NOTE: This is a complex step in real apps. The current GstPipelineControl
-        // will prevent future restarts. For this example, we'll accept the limitation
-        // that the process must restart to stream to a *new* first client.
-    }
-}
-
-async fn run_ws() -> Result<(), IoError> {
-    let addr = env::args()
-        .nth(1)
-        .unwrap_or_else(|| "0.0.0.0:5600".to_string());
-
-    let state = PeerMap::new(Mutex::new(HashMap::new()));
-    let gst_control = GstPipelineControl::new(Once::new());
-
-    let try_socket = TcpListener::bind(&addr).await;
-    let listener = try_socket.expect("Failed to bind");
-    println!("Listening on: {}", addr);
-
-    while let Ok((stream, addr)) = listener.accept().await {
-        task::spawn(handle_connection(
-            state.clone(),
-            stream,
-            addr,
-            gst_control.clone(),
-        ));
-    }
-
     Ok(())
-}
-
-fn main() {
-    // Initialize Enigo here, guaranteeing it happens before any messages are processed.
-    init_enigo();
-
-    init_vigem();
-
-    let ws_handle = task::spawn(run_ws());
-
-    let enet_handle = task::spawn(run_enet_server());
-
-    // Block the main thread to keep the async runtime and the WS server alive.
-    if let (Err(e0), Err(e1)) = task::block_on(future::join(ws_handle, enet_handle)) {
-        eprintln!("WS server task failed: {}", e0);
-        eprintln!("WS server task failed: {}", e1);
-    }
-
-    // Cleanup when the async task somehow exits (e.g., Ctrl+C, though this might be hard)
-    // Running a final stop ensures cleanup if possible.
-    stop_gstreamer_pipeline()
 }
