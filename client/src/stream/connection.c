@@ -2,21 +2,14 @@
 
 #include <gst/gstelement.h>
 #include <gst/gstobject.h>
+#include <json-glib/json-glib.h>
+#include <libsoup/soup-message.h>
+#include <libsoup/soup-session.h>
 #include <stdbool.h>
 #include <string.h>
 
 #include "status.h"
 #include "utils/logger.h"
-
-#define GST_USE_UNSTABLE_API
-
-#include <gst/webrtc/webrtc.h>
-
-#undef GST_USE_UNSTABLE_API
-
-#include <json-glib/json-glib.h>
-#include <libsoup/soup-message.h>
-#include <libsoup/soup-session.h>
 
 // clang-format off
 #define ENET_IMPLEMENTATION
@@ -41,6 +34,7 @@ struct _MyConnection {
     GCancellable *ws_cancel;
     SoupWebsocketConnection *ws;
 
+    // Can we not expose pipeline here?
     GstPipeline *pipeline;
 
     enum my_status status;
@@ -279,40 +273,22 @@ static void my_connection_class_init(MyConnectionClass *klass) {
     ALOGI("%s: End", __FUNCTION__);
 }
 
-#define MAKE_CASE(E) \
-    case E:          \
-        return #E
-
-static const char *peer_connection_state_to_string(GstWebRTCPeerConnectionState state) {
-    switch (state) {
-        MAKE_CASE(GST_WEBRTC_PEER_CONNECTION_STATE_NEW);
-        MAKE_CASE(GST_WEBRTC_PEER_CONNECTION_STATE_CONNECTING);
-        MAKE_CASE(GST_WEBRTC_PEER_CONNECTION_STATE_CONNECTED);
-        MAKE_CASE(GST_WEBRTC_PEER_CONNECTION_STATE_DISCONNECTED);
-        MAKE_CASE(GST_WEBRTC_PEER_CONNECTION_STATE_FAILED);
-        MAKE_CASE(GST_WEBRTC_PEER_CONNECTION_STATE_CLOSED);
-        default:
-            return "!Unknown!";
-    }
-}
-
 static void conn_disconnect_internal(MyConnection *conn, enum my_status status) {
     if (conn->ws_cancel != NULL) {
         g_cancellable_cancel(conn->ws_cancel);
         gst_clear_object(&conn->ws_cancel);
     }
-    // Stop the pipeline, if it exists
-    if (conn->pipeline != NULL) {
-        gst_element_set_state(GST_ELEMENT(conn->pipeline), GST_STATE_NULL);
-        //        g_signal_emit(conn, signals[SIGNAL_ON_DROP_PIPELINE], 0);
-    }
+
+    // Notify stream app to drop the pipeline.
+    ALOGI("Dropping pipeline upon WebSocket disconnection");
+    g_signal_emit(conn, signals[SIGNAL_ON_DROP_PIPELINE], 0);
+
     if (conn->ws) {
         soup_websocket_connection_close(conn->ws, 0, "");
     }
     g_clear_object(&conn->ws);
-    ALOGI("WebSocket disconnected.");
 
-    gst_clear_object(&conn->pipeline);
+    ALOGI("WebSocket disconnected.");
 
     // ENet
     if (conn->peer) {
@@ -351,17 +327,6 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
 }
 
 static void conn_connect_internal(MyConnection *conn, enum my_status status);
-
-static void conn_webrtc_deep_notify_callback(GstObject *self,
-                                             GstObject *prop_object,
-                                             GParamSpec *prop,
-                                             MyConnection *conn) {
-    GstWebRTCPeerConnectionState state;
-    g_object_get(prop_object, "connection-state", &state, NULL);
-    ALOGI("deep-notify callback says peer connection state is %s - but it lies sometimes",
-          peer_connection_state_to_string(state));
-    //	conn_update_status_from_peer_connection_state(conn, state);
-}
 
 static void conn_on_ws_message_cb(SoupWebsocketConnection *connection, gint type, GBytes *message, MyConnection *conn) {
     // ALOGD("%s", __FUNCTION__);
@@ -425,7 +390,7 @@ static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyC
     g_signal_connect(conn->ws, "message", G_CALLBACK(conn_on_ws_message_cb), conn);
     g_signal_emit(conn, signals[SIGNAL_WEBSOCKET_CONNECTED], 0);
 
-    ALOGI("Creating pipeline");
+    ALOGI("Creating pipeline upon WebSocket connection");
     g_assert_null(conn->pipeline);
     g_signal_emit(conn, signals[SIGNAL_ON_NEED_PIPELINE], 0);
     if (conn->pipeline == NULL) {
@@ -500,24 +465,25 @@ static void *enet_thread_func(void *ptr) {
 }
 
 static void conn_connect_internal(MyConnection *conn, enum my_status status) {
+    // Reset previous connection.
     my_connection_disconnect(conn);
     if (!conn->ws_cancel) {
         conn->ws_cancel = g_cancellable_new();
     }
     g_cancellable_reset(conn->ws_cancel);
 
-    ALOGI("calling soup_session_websocket_connect_async. websocket_uri = %s", conn->websocket_uri);
+    ALOGI("Calling soup_session_websocket_connect_async. WebSocket URI: %s", conn->websocket_uri);
 
     soup_session_websocket_connect_async(conn->soup_session,                                     // session
                                          soup_message_new(SOUP_METHOD_GET, conn->websocket_uri), // message
                                          NULL,                                                   // origin
                                          NULL,                                                   // protocols
-                                         0,                                                      // io_prority
+                                         0,                                                      // io_priority
                                          conn->ws_cancel,                                        // cancellable
                                          (GAsyncReadyCallback)conn_websocket_connected_cb,       // callback
                                          conn);                                                  // user_data
 
-    //    conn_update_status(conn, status);
+    conn_update_status(conn, MY_STATUS_CONNECTING);
 
     // ENet
     {

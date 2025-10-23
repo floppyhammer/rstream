@@ -11,7 +11,7 @@ G_BEGIN_DECLS
 G_DECLARE_FINAL_TYPE(MyConnection, my_connection, MY, CONNECTION, GObject)
 
 /*!
- * Create a connection object
+ * Create a connection object.
  *
  * @param websocket_uri The websocket URI to connect to. Ownership does not transfer (we copy it)
  */
@@ -20,7 +20,7 @@ MyConnection *my_connection_new(const gchar *websocket_uri);
 MyConnection *my_connection_new_localhost();
 
 /*!
- * Actually start connecting to the server
+ * Actually start connecting to the server.
  */
 void my_connection_connect(MyConnection *conn);
 
@@ -30,7 +30,7 @@ void my_connection_connect(MyConnection *conn);
 void my_connection_disconnect(MyConnection *conn);
 
 /*!
- * Send a message to the server over data channel
+ * Send a message to the server over data channel.
  */
 bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes);
 

@@ -35,10 +35,10 @@ class StreamingActivity : NativeActivity() {
 
     companion object {
         init {
-            Log.i("GstAndroidDemo", "StreamingActivity: In StreamingActivity static init")
+            Log.i("RStreamClient", "StreamingActivity: In StreamingActivity static init")
 
             System.loadLibrary("rstream_client")
-            Log.i("GstAndroidDemo", "StreamingActivity: loaded rstream_client")
+            Log.i("RStreamClient", "StreamingActivity: loaded rstream_client.so")
         }
     }
 }

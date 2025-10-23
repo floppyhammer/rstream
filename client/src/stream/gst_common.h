@@ -13,7 +13,7 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#define LOG_TAG "GstAndroidDemo"
+#define LOG_TAG "RStreamClient"
 #ifndef ALOGV
     #ifdef __ANDROID__
         #include <android/log.h>
