@@ -134,34 +134,6 @@ void stream_app_set_egl_context(StreamApp *app, EGLContext context, EGLDisplay d
         gst_gl_context_new_wrapped(app->gst_gl_display, android_main_egl_context_handle, egl_platform, gl_api));
 }
 
-static void stream_app_dispose(StreamApp *self) {
-    // May be called multiple times during destruction.
-    // Stop things and clear ref counted things here.
-    // StreamApp *self = stream_app(object);
-    stream_app_stop(self);
-
-    // Quit gstreamer thread.
-    {
-        g_main_loop_quit(self->loop);
-        os_thread_helper_stop(&self->play_thread);
-    }
-
-    g_clear_object(&self->loop);
-
-    gst_clear_object(&self->sample);
-    gst_clear_object(&self->pipeline);
-    gst_clear_object(&self->gst_gl_display);
-    gst_clear_object(&self->gst_gl_context);
-    gst_clear_object(&self->gst_gl_other_context);
-    gst_clear_object(&self->display);
-    gst_clear_object(&self->context);
-    gst_clear_object(&self->appsink);
-}
-
-static void stream_app_finalize(StreamApp *self) {
-    // Only called once, after dispose
-}
-
 /*
  * Callbacks
  */
@@ -225,7 +197,7 @@ static gboolean gst_bus_cb(GstBus *bus, GstMessage *message, gpointer user_data)
             g_free(debug_msg);
         } break;
         case GST_MESSAGE_EOS: {
-            g_error("gst_bus_cb: Got EOS!");
+//            g_error("gst_bus_cb: Got EOS!");
         } break;
         default:
             break;
@@ -339,21 +311,6 @@ StreamApp *stream_app_new() {
     return self;
 }
 
-void stream_app_destroy(StreamApp **ptr_app) {
-    if (ptr_app == NULL) {
-        return;
-    }
-    StreamApp *app = *ptr_app;
-    if (app == NULL) {
-        return;
-    }
-
-    stream_app_dispose(app);
-    stream_app_finalize(app);
-    free(app);
-    *ptr_app = NULL;
-}
-
 void stream_app_spawn_thread(StreamApp *app, MyConnection *connection) {
     ALOGI("%s: Starting stream client mainloop thread", __FUNCTION__);
     my_stream_client_set_connection(app, connection);
@@ -366,6 +323,18 @@ void stream_app_stop(StreamApp *app) {
     ALOGI("%s: Stopping pipeline and ending thread", __FUNCTION__);
 
     if (app->pipeline != NULL) {
+        gst_element_send_event(app->pipeline, gst_event_new_eos());
+
+        // Wait for an EOS message on the pipeline bus.
+        ALOGI("Waiting for pipeline EOS");
+        GstMessage *msg = NULL;
+        msg = gst_bus_timed_pop_filtered(GST_ELEMENT_BUS(app->pipeline),
+                                         GST_CLOCK_TIME_NONE,
+                                         GST_MESSAGE_EOS | GST_MESSAGE_ERROR);
+        //! @todo Should check if we got an error message here or an eos.
+        (void)msg;
+
+        // Completely stop the pipeline.
         gst_element_set_state(app->pipeline, GST_STATE_NULL);
     }
 
@@ -373,6 +342,36 @@ void stream_app_stop(StreamApp *app) {
     gst_clear_object(&app->appsink);
 
     gst_clear_object(&app->context);
+
+    // Quit gstreamer thread.
+    {
+        g_main_loop_quit(app->loop);
+        os_thread_helper_stop(&app->play_thread);
+    }
+
+    g_clear_object(&app->loop);
+}
+
+void stream_app_destroy(StreamApp **ptr_app) {
+    if (ptr_app == NULL) {
+        return;
+    }
+    StreamApp *app = *ptr_app;
+    if (app == NULL) {
+        return;
+    }
+
+    gst_clear_object(&app->sample);
+    gst_clear_object(&app->pipeline);
+    gst_clear_object(&app->gst_gl_display);
+    gst_clear_object(&app->gst_gl_context);
+    gst_clear_object(&app->gst_gl_other_context);
+    gst_clear_object(&app->display);
+    gst_clear_object(&app->context);
+    gst_clear_object(&app->appsink);
+
+    free(app);
+    *ptr_app = NULL;
 }
 
 struct MySample *stream_app_try_pull_sample(StreamApp *app, struct timespec *out_decode_end) {

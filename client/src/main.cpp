@@ -60,23 +60,6 @@ struct MyState {
 
 MyState state_ = {};
 
-void gstAndroidLog(GstDebugCategory *category,
-                   GstDebugLevel level,
-                   const gchar *file,
-                   const gchar *function,
-                   gint line,
-                   GObject *object,
-                   GstDebugMessage *message,
-                   gpointer data) {
-    if (level <= gst_debug_category_get_threshold(category)) {
-        if (level == GST_LEVEL_ERROR) {
-            ALOGE("%s, %s: %s", file, function, gst_debug_message_get(message));
-        } else {
-            ALOGD("%s, %s: %s", file, function, gst_debug_message_get(message));
-        }
-    }
-}
-
 int32_t handle_gamepad_key_event(const AInputEvent *event) {
     // 1. Check if the event came from a gamepad or D-pad
     int32_t source = AInputEvent_getSource(event);
@@ -356,14 +339,8 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             // Set up gstreamer
             gst_init(NULL, NULL);
 
-#ifdef __ANDROID__
-            gst_debug_add_log_function(&gstAndroidLog, NULL, NULL);
-#endif
-
             // Set up gst logger
-            //            gst_debug_set_default_threshold(GST_LEVEL_WARNING);
-            //		gst_debug_set_threshold_for_name("webrtcbin", GST_LEVEL_MEMDUMP);
-            //      gst_debug_set_threshold_for_name("webrtcbindatachannel", GST_LEVEL_TRACE);
+            gst_debug_set_default_threshold(GST_LEVEL_WARNING);
 
             state_.stream_app = stream_app_new();
             stream_app_set_egl_context(state_.stream_app,

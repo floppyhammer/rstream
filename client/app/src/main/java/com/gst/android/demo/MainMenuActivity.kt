@@ -2,6 +2,7 @@ package com.gst.android.demo
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import com.gst.android.demo.databinding.ActivityMainMenuBinding
@@ -10,7 +11,8 @@ class MainMenuActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainMenuBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+        Log.i("RStreamClient", "MainMenuActivity: onCreate")
+
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main_menu)
 
         // Set up the button click listener
@@ -24,5 +26,13 @@ class MainMenuActivity : AppCompatActivity() {
             // Start the StreamingActivity
             startActivity(intent)
         }
+
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onDestroy() {
+        Log.i("RStreamClient", "MainMenuActivity: onDestroy")
+
+        super.onDestroy()
     }
 }

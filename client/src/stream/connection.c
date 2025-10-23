@@ -288,7 +288,7 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
     }
     g_clear_object(&conn->ws);
 
-    ALOGI("WebSocket disconnected.");
+    ALOGI("WebSocket closed.");
 
     // ENet
     if (conn->peer) {

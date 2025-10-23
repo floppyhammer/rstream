@@ -11,6 +11,8 @@ import android.view.WindowManager
 
 class StreamingActivity : NativeActivity() {
     override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
+        Log.i("RStreamClient", "StreamingActivity: onCreate")
+
         volumeControlStream = AudioManager.STREAM_MUSIC
 
         super.onCreate(savedInstanceState, persistentState)
@@ -33,9 +35,15 @@ class StreamingActivity : NativeActivity() {
         super.onWindowFocusChanged(hasFocus)
     }
 
+    override fun onDestroy() {
+        Log.i("RStreamClient", "StreamingActivity: onDestroy")
+
+        super.onDestroy()
+    }
+
     companion object {
         init {
-            Log.i("RStreamClient", "StreamingActivity: In StreamingActivity static init")
+            Log.i("RStreamClient", "StreamingActivity: static init")
 
             System.loadLibrary("rstream_client")
             Log.i("RStreamClient", "StreamingActivity: loaded rstream_client.so")
