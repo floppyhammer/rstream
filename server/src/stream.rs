@@ -4,11 +4,13 @@ use gstreamer as gst;
 use async_std::net::{TcpListener, TcpStream};
 use async_std::task;
 use async_tungstenite::tungstenite::protocol::Message;
+use chrono::Utc;
 use futures::prelude::*;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     future, pin_mut,
 };
+use gstreamer::get_timestamp;
 use std::{
     collections::HashMap,
     io::Error as IoError,
@@ -27,6 +29,17 @@ type GstPipelineControl = Arc<Once>;
 
 type Tx = UnboundedSender<Message>;
 type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
+
+pub struct Peer {
+    pub(crate) ip: String,
+    pub(crate) time_connected: String,
+}
+
+pub struct StreamingState {
+    pub(crate) peers: HashMap<SocketAddr, Peer>,
+}
+
+pub static STREAMING_STATE_GUARD: Mutex<Option<StreamingState>> = Mutex::new(None);
 
 // ----------------------------------------------------------------------
 // --- GStreamer Functions (Now Thread-Safe) ----------------------------
@@ -137,6 +150,20 @@ async fn handle_connection(
 ) {
     println!("Incoming TCP connection from: {}", addr);
 
+    {
+        let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+        let date_as_string = Utc::now().to_string();
+        if let Some(state) = guard.as_mut() {
+            state.peers.insert(
+                addr,
+                Peer {
+                    ip: addr.to_string(),
+                    time_connected: date_as_string,
+                },
+            );
+        }
+    }
+
     let ws_stream = async_tungstenite::accept_async(raw_stream)
         .await
         .expect("Error during the websocket handshake occurred");
@@ -165,7 +192,7 @@ async fn handle_connection(
         .try_for_each(|msg| {
             // Handle the incoming message/command
             if msg.is_text() {
-                let text_msg = msg .clone();
+                let text_msg = msg.clone();
                 handle_text_message(text_msg);
             }
 
@@ -189,6 +216,13 @@ async fn handle_connection(
 
     println!("{} disconnected", &addr);
     peer_map.lock().unwrap().remove(&addr);
+
+    {
+        let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+        if let Some(state) = guard.as_mut() {
+            state.peers.remove(&addr);
+        }
+    }
 
     // Stop Pipeline if this was the last client
     if peer_map.lock().unwrap().is_empty() {

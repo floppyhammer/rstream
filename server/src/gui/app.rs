@@ -1,8 +1,9 @@
 use crate::gui::config::{Config, PeerManagementType};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
-use crate::stream::run_websocket;
+use crate::stream::{run_websocket, Peer, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
 use chrono;
+use chrono::Utc;
 use eframe::egui;
 use eframe::egui::{CollapsingHeader, DragValue, ViewportCommand, Visuals};
 use eframe::glow::Context;
@@ -56,6 +57,10 @@ impl Default for App {
         }
 
         let (sender, receiver) = mpsc::channel();
+
+        let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+        let streaming_state = StreamingState { peers: [].into() };
+        *guard = Some(streaming_state);
 
         // Initialize Enigo here, guaranteeing it happens before any messages are processed.
         init_enigo();
@@ -122,17 +127,17 @@ impl eframe::App for App {
                     CollapsingHeader::new("Connected Peers")
                         .default_open(true)
                         .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.label("(1) IP: xxxx");
-                                ui.label("Last time operated: xxxx");
-                                ui.button("Disconnect");
-                            });
+                            let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
 
-                            ui.horizontal(|ui| {
-                                ui.label("(2) IP: xxxx");
-                                ui.label("Last time operated: xxxx");
-                                ui.button("Disconnect");
-                            });
+                            if let Some(state) = guard.as_mut() {
+                                for p in &state.peers {
+                                    ui.horizontal(|ui| {
+                                        ui.label(format!("(1) IP: {}", p.1.ip));
+                                        ui.label(format!("Time connected: {}", p.1.time_connected));
+                                        ui.button("Disconnect");
+                                    });
+                                }
+                            }
                         });
 
                     ui.add_space(8.0);

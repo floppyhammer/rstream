@@ -5,8 +5,8 @@
 // #![windows_subsystem = "windows"]
 
 mod gui;
-mod stream;
 mod input;
+mod stream;
 
 use eframe::egui::{Style, Visuals};
 use std::sync::Mutex;
