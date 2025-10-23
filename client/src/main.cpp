@@ -398,7 +398,12 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
             my_connection_disconnect(state_.connection);
 
+            ALOGI("Deinitialize GStreamer.");
             gst_deinit();
+
+            ALOGI("Reset renderer and EGL data.");
+            state_.renderer->reset();
+            state_.initialEglData.reset();
         } break;
         case APP_CMD_WINDOW_RESIZED:
         case APP_CMD_CONFIG_CHANGED: {
@@ -531,10 +536,6 @@ void android_main(struct android_app *app) {
     //
     // Clean up
     //
-
-    stream_app_destroy(&state_.stream_app);
-
-    state_.initialEglData = nullptr;
 
     (*app->activity->vm).DetachCurrentThread();
 }

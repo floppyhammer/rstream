@@ -13,6 +13,7 @@
 #include <EGL/egl.h>
 #include <glib-object.h>
 #include <stdbool.h>
+
 #include "connection.h"
 
 #ifdef __cplusplus
@@ -31,15 +32,7 @@ typedef struct _StreamApp StreamApp;
 StreamApp *stream_app_new();
 
 /// Initialize the EGL context and surface.
-void stream_app_set_egl_context(StreamApp *app, EGLContext context, EGLDisplay display,
-                                EGLSurface surface);
-
-/*!
- * Clear a pointer and free the associate stream client, if any.
- *
- * Handles null checking for you.
- */
-void stream_app_destroy(StreamApp **ptr_app);
+void stream_app_set_egl_context(StreamApp *app, EGLContext context, EGLDisplay display, EGLSurface surface);
 
 /*!
  * Start the GMainLoop embedded in this object in a new thread
@@ -52,6 +45,13 @@ void stream_app_spawn_thread(StreamApp *app, MyConnection *connection);
  * Stop the pipeline and the mainloop thread.
  */
 void stream_app_stop(StreamApp *app);
+
+/*!
+ * Clear a pointer and free the associate stream client, if any.
+ *
+ * Handles null checking for you.
+ */
+void stream_app_destroy(StreamApp **ptr_app);
 
 /*!
  * Attempt to retrieve a sample, if one has been decoded.

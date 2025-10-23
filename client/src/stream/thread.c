@@ -3,28 +3,6 @@
 #include <glib.h>
 #include <pthread.h>
 
-int os_thread_helper_start(struct os_thread_helper *oth, os_run_func_t func, void *ptr) {
-    pthread_mutex_lock(&oth->mutex);
-
-    g_assert(oth->initialized);
-    if (oth->running) {
-        pthread_mutex_unlock(&oth->mutex);
-        return -1;
-    }
-
-    int ret = pthread_create(&oth->thread, NULL, func, ptr);
-    if (ret != 0) {
-        pthread_mutex_unlock(&oth->mutex);
-        return ret;
-    }
-
-    oth->running = true;
-
-    pthread_mutex_unlock(&oth->mutex);
-
-    return 0;
-}
-
 /*!
  * Zeroes the correct amount of memory based on the type pointed-to by the
  * argument.
@@ -49,6 +27,29 @@ int os_thread_helper_init(struct os_thread_helper *oth) {
         return ret;
     }
     oth->initialized = true;
+
+    return 0;
+}
+
+int os_thread_helper_start(struct os_thread_helper *oth, os_run_func_t func, void *ptr) {
+    pthread_mutex_lock(&oth->mutex);
+
+    g_assert(oth->initialized);
+
+    if (oth->running) {
+        pthread_mutex_unlock(&oth->mutex);
+        return -1;
+    }
+
+    int ret = pthread_create(&oth->thread, NULL, func, ptr);
+    if (ret != 0) {
+        pthread_mutex_unlock(&oth->mutex);
+        return ret;
+    }
+
+    oth->running = true;
+
+    pthread_mutex_unlock(&oth->mutex);
 
     return 0;
 }

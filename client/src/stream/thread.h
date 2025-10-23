@@ -21,6 +21,13 @@ struct os_thread_helper {
 };
 
 /*!
+ * Initialize the thread helper.
+ *
+ * @public @memberof os_thread_helper
+ */
+int os_thread_helper_init(struct os_thread_helper *oth);
+
+/*!
  * Run function.
  *
  * @public @memberof os_thread
@@ -28,13 +35,6 @@ struct os_thread_helper {
 typedef void *(*os_run_func_t)(void *);
 
 int os_thread_helper_start(struct os_thread_helper *oth, os_run_func_t func, void *ptr);
-
-/*!
- * Initialize the thread helper.
- *
- * @public @memberof os_thread_helper
- */
-int os_thread_helper_init(struct os_thread_helper *oth);
 
 /**
  * Signals a thread to stop and waits for it to exit.

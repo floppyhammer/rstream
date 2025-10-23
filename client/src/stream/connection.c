@@ -304,23 +304,24 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
     // Stop the pipeline, if it exists
     if (conn->pipeline != NULL) {
         gst_element_set_state(GST_ELEMENT(conn->pipeline), GST_STATE_NULL);
-        g_signal_emit(conn, signals[SIGNAL_ON_DROP_PIPELINE], 0);
+        //        g_signal_emit(conn, signals[SIGNAL_ON_DROP_PIPELINE], 0);
     }
     if (conn->ws) {
         soup_websocket_connection_close(conn->ws, 0, "");
     }
     g_clear_object(&conn->ws);
+    ALOGI("WebSocket disconnected.");
 
     gst_clear_object(&conn->pipeline);
 
     // ENet
     if (conn->peer) {
-        // Disconnect
         enet_peer_disconnect(conn->peer, 0);
 
         ENetEvent event = {0};
 
         uint8_t disconnected = false;
+
         /* Allow up to 3 seconds for the disconnect to succeed
          * and drop any packets received packets.
          */
@@ -342,6 +343,7 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
         }
 
         os_thread_helper_stop(&conn->enet_thread);
+        ALOGI("ENet thread stopped.");
 
         enet_host_destroy(conn->client);
         enet_deinitialize();
@@ -566,6 +568,11 @@ MyConnection *my_connection_new(const gchar *websocket_uri) {
 }
 
 MyConnection *my_connection_new_localhost() {
+    if (enet_initialize() != 0) {
+        printf("An error occurred while initializing ENet.\n");
+        abort();
+    }
+
     MyConnection *conn = MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, NULL));
 
     g_assert(os_thread_helper_init(&conn->enet_thread) >= 0);

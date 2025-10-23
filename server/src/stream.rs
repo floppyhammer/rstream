@@ -165,7 +165,7 @@ async fn handle_connection(
         .try_for_each(|msg| {
             // Handle the incoming message/command
             if msg.is_text() {
-                let text_msg = msg.clone();
+                let text_msg = msg .clone();
                 handle_text_message(text_msg);
             }
 

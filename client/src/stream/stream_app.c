@@ -110,8 +110,11 @@ static void stream_app_init(StreamApp *app) {
     ALOGI("%s: creating stuff", __FUNCTION__);
 
     memset(app, 0, sizeof(StreamApp));
+
     app->loop = g_main_loop_new(NULL, FALSE);
+
     g_assert(os_thread_helper_init(&app->play_thread) >= 0);
+
     g_mutex_init(&app->sample_mutex);
     ALOGI("%s: done creating stuff", __FUNCTION__);
 }
@@ -137,7 +140,12 @@ static void stream_app_dispose(StreamApp *self) {
     // StreamApp *self = stream_app(object);
     stream_app_stop(self);
 
-    g_main_loop_quit(self->loop);
+    // Quit gstreamer thread.
+    {
+        g_main_loop_quit(self->loop);
+        os_thread_helper_stop(&self->play_thread);
+    }
+
     g_clear_object(&self->loop);
 
     gst_clear_object(&self->sample);
@@ -415,10 +423,14 @@ static void *stream_app_thread_func(void *ptr) {
     StreamApp *app = (StreamApp *)ptr;
 
     create_pipeline(app);
+
+    // Play pipeline.
     g_assert(gst_element_set_state(app->pipeline, GST_STATE_PLAYING) != GST_STATE_CHANGE_FAILURE);
 
     ALOGI("%s: running GMainLoop", __FUNCTION__);
+
     g_main_loop_run(app->loop);
+
     ALOGI("%s: g_main_loop_run returned", __FUNCTION__);
 
     return NULL;
@@ -564,89 +576,6 @@ uint32_t stream_app_get_video_height(StreamApp *app) {
     return app->height;
 }
 
-static void on_need_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
-    g_info("%s", __FUNCTION__);
-    g_assert_nonnull(app);
-    g_assert_nonnull(my_conn);
-
-    //    GList *decoders = gst_element_factory_list_get_elements(GST_ELEMENT_FACTORY_TYPE_DECODABLE,
-    //                                                            GST_RANK_MARGINAL);
-    //
-    //    // Iterate through the list
-    //    for (GList *iter = decoders; iter != NULL; iter = iter->next) {
-    //        GstElementFactory *factory = (GstElementFactory *) iter->data;
-    //
-    //        // Get the factory name suitable for use in a string pipeline
-    //        const gchar *name = gst_element_get_name(factory);
-    //
-    //        // Print the factory name
-    //        g_print("Decoder: %s\n", name);
-    //    }
-
-    // We'll need an active egl context below before setting up gstgl (as explained previously)
-
-    //    // clang-format off
-    //    gchar *pipeline_string = g_strdup_printf(
-    //        "webrtcbin name=webrtc bundle-policy=max-bundle latency=0 ! "
-    //        "decodebin3 ! "
-    ////        "amcviddec-c2qtiavcdecoder ! "        // Hardware
-    ////        "amcviddec-omxqcomvideodecoderavc ! " // Hardware
-    ////        "amcviddec-c2androidavcdecoder ! "    // Software
-    ////        "amcviddec-omxgoogleh264decoder ! "   // Software
-    ////
-    ///"video/x-raw(memory:GLMemory),format=(string)RGBA,width=(int)1280,height=(int)720,texture-target=(string)external-oes
-    ///! "
-    //        "glsinkbin name=glsink");
-    //    // clang-format on
-    //
-    //    sc->pipeline = gst_object_ref_sink(gst_parse_launch(pipeline_string, &error));
-    //    if (sc->pipeline == NULL) {
-    //        ALOGE("Failed creating pipeline : Bad source: %s", error->message);
-    //        abort();
-    //    }
-    //    if (error) {
-    //        ALOGE("Error creating a pipeline from string: %s", error ? error->message : "Unknown");
-    //        abort();
-    //    }
-
-    app->pipeline = gst_pipeline_new("webrtc-recv-pipeline");
-
-    GstElement *webrtcbin = gst_element_factory_make("webrtcbin", "webrtc");
-    // Matching this to the offerer's bundle policy is necessary for negotiation
-    g_object_set(webrtcbin, "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
-    g_object_set(webrtcbin, "latency", 50, NULL);
-
-    gst_bin_add_many(GST_BIN(app->pipeline), webrtcbin, NULL);
-
-    {
-        GstBus *bus = gst_element_get_bus(app->pipeline);
-
-#ifdef ANDROID
-        // We set this up to inject the EGL context
-        gst_bus_set_sync_handler(bus, (GstBusSyncHandler)bus_sync_handler_cb, app, NULL);
-#endif
-
-        // This just watches for errors and such
-        gst_bus_add_watch(bus, gst_bus_cb, app->pipeline);
-
-        g_object_unref(bus);
-    }
-
-    // This actually hands over the pipeline. Once our own handler returns,
-    // the pipeline will be started by the connection.
-    g_signal_emit_by_name(my_conn, "set-pipeline", GST_PIPELINE(app->pipeline), NULL);
-
-    app->timeout_src_id_dot_data = g_timeout_add_seconds(3, G_SOURCE_FUNC(check_pipeline_dot_data), app->pipeline);
-}
-
-static void on_drop_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
-    if (app->pipeline) {
-        gst_element_set_state(app->pipeline, GST_STATE_NULL);
-    }
-    gst_clear_object(&app->pipeline);
-    //    gst_clear_object(&app->app_sink);
-}
-
 /*
  * Helper functions
  */
@@ -655,8 +584,6 @@ static void my_stream_client_set_connection(StreamApp *app, MyConnection *connec
     g_clear_object(&app->connection);
     if (connection != NULL) {
         app->connection = g_object_ref(connection);
-        g_signal_connect(app->connection, "on-need-pipeline", G_CALLBACK(on_need_pipeline_cb), app);
-        g_signal_connect(app->connection, "on-drop-pipeline", G_CALLBACK(on_drop_pipeline_cb), app);
         ALOGI("%s: a connection assigned to the stream client", __FUNCTION__);
     }
 }
