@@ -4,60 +4,64 @@ use std::io::prelude::*;
 
 const CONFIG_FILE: &str = "config.json";
 
+const DEFAULT_BITRATE: u32 = 8;
+
 #[derive(PartialEq, Clone)]
-pub enum BuildType {
-    All,
-    Sdk,
+pub enum PeerManagementType {
+    SinglePeer,
+    MultiplePeersSingleControl,
+    MultiplePeersMultipleControl,
 }
 
-impl std::fmt::Display for BuildType {
+impl std::fmt::Display for PeerManagementType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            BuildType::All => write!(f, "all"),
-            BuildType::Sdk => write!(f, "sdk"),
+            PeerManagementType::SinglePeer => write!(f, "SinglePeer"),
+            PeerManagementType::MultiplePeersSingleControl => {
+                write!(f, "MultiplePeersSingleControl")
+            }
+            PeerManagementType::MultiplePeersMultipleControl => {
+                write!(f, "MultiplePeersMultipleControl")
+            }
         }
     }
 }
 
-impl BuildType {
-    fn from_u32(value: u32) -> BuildType {
+impl PeerManagementType {
+    fn from_u32(value: u32) -> PeerManagementType {
         match value {
-            0 => BuildType::All,
-            1 => BuildType::Sdk,
+            0 => PeerManagementType::SinglePeer,
+            1 => PeerManagementType::MultiplePeersSingleControl,
+            2 => PeerManagementType::MultiplePeersMultipleControl,
             _ => panic!("Unknown value: {}", value),
         }
     }
 
     fn to_u32(&self) -> u32 {
         match self {
-            BuildType::All => 0,
-            BuildType::Sdk => 1,
+            PeerManagementType::SinglePeer => 0,
+            PeerManagementType::MultiplePeersSingleControl => 1,
+            PeerManagementType::MultiplePeersMultipleControl => 2,
         }
     }
 }
 
 pub struct Config {
-    pub thread_count: u32,
-    pub build_type: BuildType,
-    pub ndk_dir: String,
-    pub engine_dir: String,
-    pub dst_dir: String,
+    pub bitrate: u32,
+    pub peer_management_type: PeerManagementType,
+    pub pin: String,
     pub dark_mode: bool,
 }
 
 impl Config {
     pub fn new() -> Self {
-        let build_type = BuildType::All;
-        let ndk_dir = "D:/Env/android-ndk-r21e".to_string();
-        let engine_dir = "D:/Dev/QuVideo/ces_adk".to_string();
-        let dst_dir = String::new();
+        let peer_management_type = PeerManagementType::SinglePeer;
+        let pin = "".to_string();
 
         Self {
-            thread_count: 0,
-            build_type,
-            ndk_dir,
-            engine_dir,
-            dst_dir,
+            bitrate: DEFAULT_BITRATE,
+            peer_management_type,
+            pin,
             dark_mode: true,
         }
     }
@@ -79,12 +83,13 @@ impl Config {
             json_string,
         );
 
-        self.build_type =
-            BuildType::from_u32(json_value["build_type"].as_u64().unwrap_or(0) as u32);
-        self.thread_count = json_value["thread_count"].as_u64().unwrap_or(4) as u32;
-        self.ndk_dir = String::from(json_value["ndk_dir"].as_str().unwrap_or(""));
-        self.engine_dir = String::from(json_value["engine_dir"].as_str().unwrap_or(""));
-        self.dst_dir = String::from(json_value["dst_dir"].as_str().unwrap_or(""));
+        self.peer_management_type = PeerManagementType::from_u32(
+            json_value["peer_management_type"].as_u64().unwrap_or(0) as u32,
+        );
+        self.bitrate = json_value["bitrate"]
+            .as_u64()
+            .unwrap_or(DEFAULT_BITRATE as u64) as u32;
+        self.pin = String::from(json_value["pin"].as_str().unwrap_or(""));
         self.dark_mode = json_value["dark_mode"].as_bool().unwrap_or(true);
 
         Ok(())
@@ -92,12 +97,10 @@ impl Config {
 
     pub fn write(&mut self) -> std::io::Result<()> {
         let json_value = json!({
-            "thread_count": self.thread_count,
-            "build_type": self.build_type.to_u32(),
+            "bitrate": self.bitrate,
+            "peer_management_type": self.peer_management_type.to_u32(),
             "dark_mode": self.dark_mode,
-            "ndk_dir": self.ndk_dir,
-            "engine_dir": self.engine_dir,
-            "dst_dir": self.dst_dir,
+            "pin": self.pin,
         });
 
         let json_string = serde_json::to_string_pretty(&json_value).unwrap();

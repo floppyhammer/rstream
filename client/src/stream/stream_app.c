@@ -165,8 +165,6 @@ static GstBusSyncReply bus_sync_handler_cb(GstBus *bus, GstMessage *msg, StreamA
 }
 
 static gboolean gst_bus_cb(GstBus *bus, GstMessage *message, gpointer user_data) {
-    // LOG_MSG(message);
-
     GstBin *pipeline = GST_BIN(user_data);
 
     switch (GST_MESSAGE_TYPE(message)) {
@@ -174,13 +172,6 @@ static gboolean gst_bus_cb(GstBus *bus, GstMessage *message, gpointer user_data)
             GError *gerr = NULL;
             gchar *debug_msg = NULL;
             gst_message_parse_error(message, &gerr, &debug_msg);
-
-            GST_DEBUG_BIN_TO_DOT_FILE(pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-error");
-
-            gchar *dot_data = gst_debug_bin_to_dot_data(pipeline, GST_DEBUG_GRAPH_SHOW_ALL);
-            ALOGE("gst_bus_cb: DOT data: %s", dot_data);
-            g_free(dot_data);
-
             ALOGE("gst_bus_cb: Error: %s (%s)", gerr->message, debug_msg);
             g_error("gst_bus_cb: Error: %s (%s)", gerr->message, debug_msg);
             g_error_free(gerr);
@@ -190,14 +181,13 @@ static gboolean gst_bus_cb(GstBus *bus, GstMessage *message, gpointer user_data)
             GError *gerr = NULL;
             gchar *debug_msg = NULL;
             gst_message_parse_warning(message, &gerr, &debug_msg);
-            GST_DEBUG_BIN_TO_DOT_FILE(pipeline, GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-warning");
             ALOGW("gst_bus_cb: Warning: %s (%s)", gerr->message, debug_msg);
             g_warning("gst_bus_cb: Warning: %s (%s)", gerr->message, debug_msg);
             g_error_free(gerr);
             g_free(debug_msg);
         } break;
         case GST_MESSAGE_EOS: {
-//            g_error("gst_bus_cb: Got EOS!");
+            //            g_error("gst_bus_cb: Got EOS!");
         } break;
         default:
             break;

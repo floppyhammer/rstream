@@ -1,4 +1,4 @@
-use crate::gui::config::{BuildType, Config};
+use crate::gui::config::{Config, PeerManagementType};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::run_websocket;
 use async_std::task;
@@ -29,22 +29,9 @@ enum BuildStatus {
 pub struct App {
     config: Config,
 
-    // Render engine related.
-    render_engine_enabled: bool,
-    qe_sprite_enabled: bool,
-    motion_tile_enabled: bool,
-    cube3d_enabled: bool,
-    qe_vg2d_enabled: bool,
-
-    // Video editor related.
-    video_editor_enabled: bool,
-    text_draw_enabled: bool,
-    animation_text_enabled: bool,
-    frame_reader_enabled: bool,
-    et_effect_enabled: bool,
-    xml_engine_lib_enabled: bool,
-    et_effect_template_utils: bool,
-    et_text_utils: bool,
+    // Extra options.
+    option1_enabled: bool,
+    option2_enabled: bool,
 
     terminal_output: String,
 
@@ -82,20 +69,8 @@ impl Default for App {
         Self {
             config,
 
-            render_engine_enabled: false,
-            qe_sprite_enabled: false,
-            motion_tile_enabled: false,
-            cube3d_enabled: false,
-            qe_vg2d_enabled: false,
-
-            video_editor_enabled: false,
-            text_draw_enabled: false,
-            animation_text_enabled: false,
-            frame_reader_enabled: false,
-            et_effect_enabled: false,
-            xml_engine_lib_enabled: false,
-            et_effect_template_utils: false,
-            et_text_utils: false,
+            option1_enabled: false,
+            option2_enabled: false,
 
             terminal_output: String::new(),
 
@@ -114,19 +89,8 @@ impl eframe::App for App {
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         let Self {
-            video_editor_enabled,
-            text_draw_enabled,
-            animation_text_enabled,
-            render_engine_enabled,
-            qe_sprite_enabled,
-            motion_tile_enabled,
-            cube3d_enabled,
-            qe_vg2d_enabled,
-            frame_reader_enabled,
-            et_effect_enabled,
-            xml_engine_lib_enabled,
-            et_effect_template_utils,
-            et_text_utils,
+            option1_enabled,
+            option2_enabled,
             terminal_output,
             build_status,
             ..
@@ -151,343 +115,144 @@ impl eframe::App for App {
             });
         });
 
-        egui::SidePanel::left("side_panel")
-            .resizable(false)
-            .show(ctx, |ui| {
-                ScrollArea::vertical()
-                    .auto_shrink([true; 2])
-                    .show_viewport(ui, |ui, _| {
-                        ui.add_space(8.0);
-                        ui.heading("Peer");
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ScrollArea::vertical()
+                .auto_shrink([true; 2])
+                .show_viewport(ui, |ui, _| {
+                    CollapsingHeader::new("Connected Peers")
+                        .default_open(true)
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label("(1) IP: xxxx");
+                                ui.label("Last time operated: xxxx");
+                                ui.button("Disconnect");
+                            });
 
-                        ui.add_space(8.0);
-
-                        ui.horizontal(|ui| {
-                            ui.label("(1) IP: xxxx");
-                            ui.label("Last time operated: xxxx");
-                            // ui.add(
-                            //     DragValue::new(&mut self.config.thread_count)
-                            //         .clamp_range(RangeInclusive::new(1, 16)),
-                            // );
-                            ui.button("Disconnect");
+                            ui.horizontal(|ui| {
+                                ui.label("(2) IP: xxxx");
+                                ui.label("Last time operated: xxxx");
+                                ui.button("Disconnect");
+                            });
                         });
 
-                        ui.add_space(8.0);
+                    ui.add_space(8.0);
 
-                        ui.horizontal(|ui| {
-                            ui.label("Build type:");
-                            ui.radio_value(&mut self.config.build_type, BuildType::All, "All");
-                            ui.radio_value(&mut self.config.build_type, BuildType::Sdk, "Sdk");
+                    ui.horizontal(|ui| {
+                        ui.label("PIN");
+
+                        if ui.text_edit_singleline(&mut self.config.pin).changed() {}
+
+                        // if ui.button("Open…").clicked() {
+                        //     if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                        //         self.config.pin = path.display().to_string();
+                        //     }
+                        // }
+                    });
+
+                    ui.add_space(8.0);
+
+                    ui.horizontal(|ui| {
+                        ui.label("Bitrate (Mbps)");
+                        ui.add(
+                            DragValue::new(&mut self.config.bitrate)
+                                .clamp_range(RangeInclusive::new(1, 100)),
+                        );
+                    });
+
+                    ui.add_space(8.0);
+
+                    CollapsingHeader::new("Peer management type")
+                        .default_open(true)
+                        .show(ui, |ui| {
+                            ui.radio_value(
+                                &mut self.config.peer_management_type,
+                                PeerManagementType::SinglePeer,
+                                PeerManagementType::SinglePeer.to_string(),
+                            );
+                            ui.radio_value(
+                                &mut self.config.peer_management_type,
+                                PeerManagementType::MultiplePeersSingleControl,
+                                PeerManagementType::MultiplePeersSingleControl.to_string(),
+                            );
+                            ui.radio_value(
+                                &mut self.config.peer_management_type,
+                                PeerManagementType::MultiplePeersMultipleControl,
+                                PeerManagementType::MultiplePeersMultipleControl.to_string(),
+                            );
 
                             // Add tooltip.
                             if ui.ui_contains_pointer() {
                                 egui::show_tooltip(
                                     ui.ctx(),
-                                    egui::Id::new("build_type_tooltip"),
+                                    egui::Id::new("peer_management_tooltip"),
                                     |ui| {
-                                        ui.label("In most cases, ALL is for Android and SDK is for iOS");
-                                    });
-                            }
-                        });
-
-                        ui.add_space(8.0);
-
-                        ui.label("NDK directory:");
-
-                        ui.horizontal(|ui| {
-                            if ui.text_edit_singleline(&mut self.config.ndk_dir).changed() {}
-
-                            if ui.button("Open…").clicked() {
-                                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                    self.config.ndk_dir = path.display().to_string();
-                                }
-                            }
-                        });
-
-                        ui.add_space(8.0);
-
-                        ui.label("Engine directory:");
-
-                        ui.horizontal(|ui| {
-                            if ui.text_edit_singleline(&mut self.config.engine_dir).changed() {}
-
-                            if ui.button("Open…").clicked() {
-                                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                    self.config.engine_dir = path.display().to_string();
-                                }
-                            }
-                        });
-
-                        ui.add_space(8.0);
-
-                        ui.label("Copy built libraries to:");
-
-                        ui.horizontal(|ui| {
-                            if ui.text_edit_singleline(&mut self.config.dst_dir).changed() {}
-
-                            if ui.button("Open…").clicked() {
-                                if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                    self.config.dst_dir = path.display().to_string();
-                                }
-                            }
-                        });
-
-                        ui.add_space(8.0);
-
-                        CollapsingHeader::new("Video Editor Submodules")
-                            .default_open(true)
-                            .show(ui, |ui| {
-                                ui.checkbox(text_draw_enabled, "TextDraw");
-                                ui.checkbox(animation_text_enabled, "AnimationText");
-                                ui.checkbox(frame_reader_enabled, "FrameReader");
-                                ui.checkbox(motion_tile_enabled, "MotionTile");
-                                ui.checkbox(cube3d_enabled, "3dCube");
-                                ui.checkbox(et_effect_enabled, "EtEffect");
-                                ui.checkbox(xml_engine_lib_enabled, "XmlEngineLib");
-                                ui.checkbox(et_effect_template_utils, "EtEffectTemplateUtils");
-                                ui.checkbox(et_text_utils, "EtTextUtils");
-
-                                // We must rebuild VideoEditor if we try to rebuild any of its submodules.
-                                if *text_draw_enabled || *animation_text_enabled || *frame_reader_enabled || *motion_tile_enabled || *cube3d_enabled || *et_effect_enabled || *xml_engine_lib_enabled || *et_effect_template_utils || *et_text_utils {
-                                    *video_editor_enabled = true;
-                                }
-
-                                if ui.checkbox(video_editor_enabled, "VideoEditor").changed() {
-                                    // Disabling VideoEditor disables any of its submodules.
-                                    if !*video_editor_enabled {
-                                        *text_draw_enabled = false;
-                                        *animation_text_enabled = false;
-                                        *frame_reader_enabled = false;
-                                        *motion_tile_enabled = false;
-                                        *cube3d_enabled = false;
-                                        *et_effect_enabled = false;
-                                        *xml_engine_lib_enabled = false;
-                                        *et_effect_template_utils = false;
-                                        *et_text_utils = false;
-                                    }
-                                }
-                            });
-
-                        ui.add_space(8.0);
-
-                        if ui.button("Open output folder").clicked() {
-                            // Using "/" in the directory here will cause the Explorer open a wrong directory.
-                            Command::new("explorer")
-                                .arg(format!("{}/videoeditor/makefile/android_so/libs/arm64-v8a", self.config.engine_dir).replace("/", "\\"))
-                                .spawn()
-                                .unwrap();
-                        }
-
-                        ui.add_space(8.0);
-
-                        if self.pending_cmd_count <= 0 {
-                            if ui.button("Build").clicked() {
-                                terminal_output.clear();
-
-                                // Show current time.
-                                terminal_output.push_str(
-                                    &*(chrono::offset::Local::now().to_string() + "\n\n"),
+                                        ui.label("Manage peers");
+                                    },
                                 );
-
-                                *build_status = BuildStatus::None;
-
-                                // Batches run independently in different processes.
-                                let mut cmd_line_batches: Vec<Vec<String>> = Vec::new();
-
-                                let build_line = format!("\nndk-build t={} -j{} APP_ABI=arm64-v8a", self.config.build_type.to_string(), self.config.thread_count);
-                                let env_line = format!("\n$env:Path += ';{}'", self.config.ndk_dir);
-
-                                if *qe_sprite_enabled {
-                                    add_cmd_line_batch("qesprite".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                if *qe_vg2d_enabled {
-                                    add_cmd_line_batch("qevg2d".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                // RenderEngine. Should be done before compiling VideoEditor's shared library.
-                                if *render_engine_enabled {
-                                    cmd_line_batches.push(vec!["\n'Building RenderEngine (static & shared libraries)...'".to_owned()]);
-
-                                    // Static lib.
-                                    let mut cmd_lines = Vec::new();
-
-                                    cmd_lines.push(env_line.clone());
-
-                                    cmd_lines.push(
-                                        format!("\nSet-Location '{}/RenderEngine/makefile/android_a/jni'", self.config.engine_dir)
-                                    );
-
-                                    cmd_lines.push(build_line.clone());
-
-                                    cmd_lines.push(
-                                        format!("\nCopy-Item '../obj/local/arm64-v8a/*.a' '{}/lib/android_arm64-v8a'", self.config.engine_dir)
-                                    );
-
-                                    cmd_line_batches.push(cmd_lines);
-
-                                    // Shared lib (with linked submodules).
-                                    let mut cmd_lines = Vec::new();
-
-                                    cmd_lines.push(env_line.clone());
-
-                                    cmd_lines.push(
-                                        format!("\nSet-Location '{}/RenderEngine/makefile/android/jni'", self.config.engine_dir)
-                                    );
-
-                                    cmd_lines.push(build_line.clone());
-
-                                    cmd_lines.push(
-                                        format!("\nCopy-Item '../libs/arm64-v8a/*.so' '{}/lib/android_arm64-v8a'", self.config.engine_dir)
-                                    );
-
-                                    cmd_line_batches.push(cmd_lines);
-                                }
-
-                                if *text_draw_enabled {
-                                    add_cmd_line_batch("textdraw".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                if *animation_text_enabled {
-                                    add_cmd_line_batch("animationtext".into(), &env_line, &self.config.engine_dir, &build_line, Some(self.config.build_type.clone()), &mut cmd_line_batches);
-                                }
-
-                                if *frame_reader_enabled {
-                                    add_cmd_line_batch("framereader".into(), &env_line, &self.config.engine_dir, &build_line, Some(self.config.build_type.clone()), &mut cmd_line_batches);
-                                }
-
-                                if *motion_tile_enabled {
-                                    add_cmd_line_batch("motion_tile".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                if *cube3d_enabled {
-                                    add_cmd_line_batch("3Dcube".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                if *et_effect_enabled {
-                                    add_cmd_line_batch("eteffect".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                if *xml_engine_lib_enabled {
-                                    add_cmd_line_batch("xml_engine_lib".into(), &env_line, &self.config.engine_dir, &build_line, Some(self.config.build_type.clone()), &mut cmd_line_batches);
-                                }
-
-                                if *et_effect_template_utils {
-                                    add_cmd_line_batch("eteffecttemplateutils".into(), &env_line, &self.config.engine_dir, &build_line, Some(self.config.build_type.clone()), &mut cmd_line_batches);
-                                }
-
-                                if *et_text_utils {
-                                    add_cmd_line_batch("textutils".into(), &env_line, &self.config.engine_dir, &build_line, None, &mut cmd_line_batches);
-                                }
-
-                                // VideoEditor. Will copy the compiled RenderEngine shared library to its output folder.
-                                if *video_editor_enabled {
-                                    cmd_line_batches.push(vec![
-                                        "\n'Building VideoEditor (shared library)...'".to_owned(),
-                                    ]);
-
-                                    let mut cmd_lines = Vec::new();
-
-                                    cmd_lines.push(env_line.clone());
-
-                                    cmd_lines.push(
-                                        format!("\nSet-Location '{}/videoeditor/makefile/android_so/jni'", self.config.engine_dir),
-                                    );
-
-                                    cmd_lines.push(build_line.clone());
-
-                                    cmd_line_batches.push(cmd_lines);
-                                }
-
-                                // Copy built libraries to the destination folder.
-                                if !self.config.dst_dir.is_empty() {
-                                    cmd_line_batches.push(vec![
-                                        format!(
-                                            "\nCopy-Item '{}/videoeditor/makefile/android_so/libs/arm64-v8a/*.so' '{}'", self.config.engine_dir, self.config.dst_dir
-                                        )
-                                    ]);
-                                }
-
-                                self.pending_cmd_count = cmd_line_batches.len() as i32;
-
-                                if self.pending_cmd_count != 0 {
-                                    let sender = self.sender.clone();
-
-                                    thread::spawn(move || {
-                                        for mut batch in cmd_line_batches {
-                                            // Execute a cmd and wait.
-                                            let (output_string, res) =
-                                                run_powershell_cmd(&mut batch);
-
-                                            // Send results.
-                                            sender
-                                                .lock()
-                                                .expect("Sending result to channel failed!")
-                                                .send((output_string, res))
-                                                .unwrap();
-
-                                            // If some cmd failed, stop the thread.
-                                            if !res {
-                                                break;
-                                            }
-                                        }
-                                    });
-                                }
                             }
-                        } else {
-                            let _ = ui.button("Running");
-                            *build_status = BuildStatus::None;
-                        }
+                        });
 
-                        match self.receiver.try_recv() {
-                            Ok(value) => {
-                                let (output_string, res) = value;
+                    ui.add_space(8.0);
 
-                                if res {
-                                    // Update the count of the pending cmds.
-                                    self.pending_cmd_count -= 1;
+                    CollapsingHeader::new("Extra options")
+                        .default_open(true)
+                        .show(ui, |ui| {
+                            ui.checkbox(option1_enabled, "option1");
+                            ui.checkbox(option2_enabled, "option2");
+                        });
 
-                                    // All cmds have finished successfully. Build succeeds.
-                                    if self.pending_cmd_count == 0 {
-                                        *build_status = BuildStatus::Success;
-                                    }
-                                } else {
-                                    // If any cmd fails, the build fails.
-                                    // And clear pending cmds.
-                                    *build_status = BuildStatus::Fail;
-                                    self.pending_cmd_count = 0;
-                                }
+                    ui.add_space(8.0);
 
-                                terminal_output.push_str(&output_string);
-                            }
-                            Err(_) => {}
-                        }
+                    if ui.button("Host").clicked() {
+                        println!("Host");
+                    }
 
-                        match build_status {
-                            BuildStatus::None => {
-                                ui.colored_label(Color32::YELLOW, "");
-                            }
-                            BuildStatus::Success => {
-                                ui.colored_label(Color32::GREEN, "Build succeeded.");
-                            }
-                            BuildStatus::Fail => {
-                                ui.colored_label(Color32::RED, "Build failed!");
-                            }
-                        }
+                    ui.add_space(8.0);
+
+                    // The central panel the region left after adding TopPanel's and SidePanel's
+                    ui.heading("Logs");
+
+                    ScrollArea::vertical().show(ui, |ui| {
+                        let output = TextEdit::multiline(terminal_output).interactive(true);
+                        ui.add(output);
                     });
-            });
 
-        egui::CentralPanel::default().show(ctx, |ui| {
-            // The central panel the region left after adding TopPanel's and SidePanel's
-            ui.heading("Terminal Output");
-            ui.add_space(8.0);
+                    match self.receiver.try_recv() {
+                        Ok(value) => {
+                            let (output_string, res) = value;
 
-            ScrollArea::vertical().show(ui, |ui| {
-                let output = TextEdit::multiline(terminal_output)
-                    .desired_width(f32::INFINITY)
-                    .interactive(true);
-                ui.add(output);
-            });
+                            if res {
+                                // Update the count of the pending cmds.
+                                self.pending_cmd_count -= 1;
+
+                                // All cmds have finished successfully. Build succeeds.
+                                if self.pending_cmd_count == 0 {
+                                    *build_status = BuildStatus::Success;
+                                }
+                            } else {
+                                // If any cmd fails, the build fails.
+                                // And clear pending cmds.
+                                *build_status = BuildStatus::Fail;
+                                self.pending_cmd_count = 0;
+                            }
+
+                            terminal_output.push_str(&output_string);
+                        }
+                        Err(_) => {}
+                    }
+
+                    match build_status {
+                        BuildStatus::None => {
+                            ui.colored_label(Color32::YELLOW, "");
+                        }
+                        BuildStatus::Success => {
+                            ui.colored_label(Color32::GREEN, "Build succeeded.");
+                        }
+                        BuildStatus::Fail => {
+                            ui.colored_label(Color32::RED, "Build failed!");
+                        }
+                    }
+                });
         });
 
         // Override reactive mode.
@@ -539,42 +304,4 @@ fn run_powershell_cmd(cmd_lines: &mut Vec<String>) -> (String, bool) {
     };
 
     (output_str.to_owned(), res)
-}
-
-fn add_cmd_line_batch(
-    module: String,
-    env_line: &String,
-    engine_dir: &String,
-    build_line: &String,
-    build_type: Option<BuildType>,
-    cmd_line_batches: &mut Vec<Vec<String>>,
-) {
-    let mut cmd_lines = Vec::new();
-
-    // We have to add the ndk dir to env path for each batch.
-    cmd_lines.push(env_line.clone());
-
-    cmd_lines.push(format!(
-        "\nSet-Location '{}/{}/makefile/android/jni'",
-        engine_dir, module
-    ));
-
-    cmd_lines.push(build_line.clone());
-
-    // If this module needs a build type.
-    if let Some(build_type) = build_type {
-        cmd_lines.push(format!(
-            "\nCopy-Item '../obj/local/arm64-v8a/*.a' '{}/lib/android_arm64-v8a/{}'",
-            engine_dir,
-            build_type.to_string()
-        ));
-    } else {
-        cmd_lines.push(format!(
-            "\nCopy-Item '../obj/local/arm64-v8a/*.a' '{}/lib/android_arm64-v8a'",
-            engine_dir
-        ));
-    }
-
-    cmd_line_batches.push(vec![format!("\n'Building {}...'", module).to_owned()]);
-    cmd_line_batches.push(cmd_lines);
 }
