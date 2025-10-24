@@ -17,6 +17,7 @@ G_DECLARE_FINAL_TYPE(MyConnection, my_connection, MY, CONNECTION, GObject)
  */
 MyConnection *my_connection_new(const gchar *websocket_uri);
 
+/// Use a default websocket_uri.
 MyConnection *my_connection_new_localhost();
 
 /*!

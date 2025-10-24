@@ -29,7 +29,6 @@
 #include "stream/stream_app.h"
 
 namespace {
-
 struct MyState {
     bool connected;
 
@@ -52,6 +51,8 @@ struct MyState {
 
     MyConnection *connection;
     StreamApp *stream_app;
+
+    std::string host_ip;
 
     std::unique_ptr<Renderer> renderer;
 
@@ -205,7 +206,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                                                client_x,
                                                client_y);
             }
-            // A second touch is down.
+                // A second touch is down.
             case AMOTION_EVENT_ACTION_POINTER_DOWN: {
                 int32_t action_code = action & AMOTION_EVENT_ACTION_MASK;
                 size_t pointer_index =
@@ -336,7 +337,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
                             EGL_HEIGHT,
                             &state_.window_height);
 
-            // Set up gstreamer
+            ALOGI("Initialize GStreamer.");
             gst_init(NULL, NULL);
 
             // Set up gst logger
@@ -348,9 +349,8 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
                                        state_.initialEglData->display,
                                        state_.initialEglData->surface);
 
-            state_.connection = g_object_ref_sink(my_connection_new_localhost());
-
-            my_connection_connect(state_.connection);
+            std::string websocket_uri = "ws://" + state_.host_ip + ":5600/ws";
+            state_.connection = g_object_ref_sink(my_connection_new(websocket_uri.c_str()));
 
             ALOGI("%s: starting stream client mainloop thread", __FUNCTION__);
             stream_app_spawn_thread(state_.stream_app, state_.connection);
@@ -374,9 +374,6 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             stream_app_destroy(&state_.stream_app);
 
             my_connection_disconnect(state_.connection);
-
-            ALOGI("Deinitialize GStreamer.");
-            gst_deinit();
 
             ALOGI("Reset renderer and EGL data.");
             state_.renderer->reset();
@@ -444,8 +441,62 @@ void android_main(struct android_app *app) {
 
     app->onInputEvent = handle_input;
 
+    // Retrieve host IP.
+    {
+        // The NativeActivity's Java object is available here:
+        jobject nativeActivity = app->activity->clazz;
+
+        // --- 2. Find the Activity Class and its getIntent() method ---
+        // The activity object is already available via nativeActivity
+        jclass activityClass = env->GetObjectClass(nativeActivity);
+
+        // The signature for 'getIntent()' is ()Landroid/content/Intent;
+        jmethodID getIntentMethod = env->GetMethodID(activityClass, "getIntent", "()Landroid/content/Intent;");
+
+        if (!getIntentMethod) {
+            __android_log_print(ANDROID_LOG_ERROR, "NATIVE_LOG", "Failed to find getIntent() method.");
+            // Detach and return or handle error
+            app->activity->vm->DetachCurrentThread();
+            return;
+        }
+
+        // --- 3. Call the getIntent() method on the nativeActivity object ---
+        jobject intentObject = env->CallObjectMethod(nativeActivity, getIntentMethod);
+
+        // --- 4. Now, proceed to call getStringExtra() on the intentObject ---
+        // (This part is the same as the previous example, using the 'env' pointer)
+
+        jclass intentClass = env->FindClass("android/content/Intent");
+        jmethodID getStringExtraMethod =
+            env->GetMethodID(intentClass, "getStringExtra", "(Ljava/lang/String;)Ljava/lang/String;");
+
+        const char *DATA_KEY = "host_ip";
+        jstring keyString = env->NewStringUTF(DATA_KEY);
+
+        jstring nativeDataJString = (jstring)env->CallObjectMethod(intentObject, getStringExtraMethod, keyString);
+
+        // --- 4. Process the data and Clean Up ---
+        if (nativeDataJString != NULL) {
+            const char *finalData = env->GetStringUTFChars(nativeDataJString, 0);
+
+            state_.host_ip = finalData;
+            ALOGI("host_ip received: %s", state_.host_ip.c_str());
+
+            // Clean up
+            env->ReleaseStringUTFChars(nativeDataJString, finalData);
+            env->DeleteLocalRef(nativeDataJString);
+        } else {
+            ALOGI("Data key not found.");
+        }
+
+        // Final clean up
+        env->DeleteLocalRef(keyString);
+        env->DeleteLocalRef(intentClass);
+        env->DeleteLocalRef(intentObject);
+    }
+
     // Main rendering loop.
-    ALOGI("DEBUG: Starting main loop");
+    ALOGI("Starting main loop");
     while (!app->destroyRequested) {
         if (!poll_events(app)) {
             continue;
@@ -508,11 +559,13 @@ void android_main(struct android_app *app) {
         state_.initialEglData->makeNotCurrent();
     }
 
-    ALOGI("DEBUG: Exited main loop, cleaning up");
+    ALOGI("Exited main loop, cleaning up");
 
     //
     // Clean up
     //
+    // Don't call this.
+    //    gst_deinit();
 
     (*app->activity->vm).DetachCurrentThread();
 }

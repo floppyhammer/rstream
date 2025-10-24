@@ -16,6 +16,19 @@ class StreamingActivity : NativeActivity() {
         volumeControlStream = AudioManager.STREAM_MUSIC
 
         super.onCreate(savedInstanceState, persistentState)
+
+//
+//        // Retrieve the intent extras
+//        val extras = getIntent().getExtras()
+//        if (extras != null) {
+//            val dataToPass = extras.getString("host_ip")
+//
+//            // IMPORTANT: Now pass this data to the native C/C++ code
+//            // by calling a JNI function.
+//            if (dataToPass != null) {
+//                passDataToNative(dataToPass) // This is your JNI function
+//            }
+//        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

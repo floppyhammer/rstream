@@ -526,6 +526,8 @@ MyConnection *my_connection_new(const gchar *websocket_uri) {
         abort();
     }
 
+    ALOGI("New connection to: %s", websocket_uri);
+
     MyConnection *conn = MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, "websocket-uri", websocket_uri, NULL));
 
     g_assert(os_thread_helper_init(&conn->enet_thread) >= 0);
