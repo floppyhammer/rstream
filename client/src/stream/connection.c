@@ -19,7 +19,7 @@
 #include "input.h"
 #include "thread.h"
 
-#define SERVER_ADDRESS "10.11.9.210"
+#define SERVER_ADDRESS "192.168.31.178"
 #define DEFAULT_WEBSOCKET_URI "ws://" SERVER_ADDRESS ":5600/ws"
 
 /*!

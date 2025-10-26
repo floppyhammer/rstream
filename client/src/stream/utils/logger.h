@@ -1,6 +1,6 @@
 #pragma once
 
-#define LOG_TAG "GstWebrtcDemo"
+#define LOG_TAG "RStreamClient"
 
 #ifndef ALOGV
     #ifdef __ANDROID__
