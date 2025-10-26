@@ -352,6 +352,8 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             std::string websocket_uri = "ws://" + state_.host_ip + ":5600/ws";
             state_.connection = g_object_ref_sink(my_connection_new(websocket_uri.c_str()));
 
+            my_connection_connect(state_.connection);
+
             ALOGI("%s: starting stream client mainloop thread", __FUNCTION__);
             stream_app_spawn_thread(state_.stream_app, state_.connection);
 
