@@ -1,3 +1,4 @@
+use crate::discovery::run_announcer;
 use crate::gui::config::{Config, PeerManagementType};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::{run_websocket, Peer, StreamingState, STREAMING_STATE_GUARD};
@@ -70,6 +71,8 @@ impl Default for App {
         let ws_handle = task::spawn(run_websocket(5600));
 
         let enet_handle = task::spawn(run_enet_server());
+
+        let announcer_handle = task::spawn(run_announcer());
 
         Self {
             config,

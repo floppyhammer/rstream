@@ -57,6 +57,8 @@ struct MyState {
     std::unique_ptr<Renderer> renderer;
 
     std::unique_ptr<EglData> initialEglData;
+
+    pthread_t listener_tid;
 };
 
 MyState state_ = {};

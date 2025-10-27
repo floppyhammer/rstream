@@ -2,6 +2,7 @@ package com.gst.android.demo
 
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.util.Log
 import android.widget.EditText
@@ -11,11 +12,13 @@ import com.gst.android.demo.databinding.ActivityMainMenuBinding
 import androidx.core.content.edit
 
 class MainMenuActivity : AppCompatActivity() {
-
     private lateinit var editText: EditText
     private val PREFS_NAME = "MyPrefsFile"
     private val TEXT_KEY = "host_ip"
     private lateinit var binding: ActivityMainMenuBinding
+
+    private val UDP_PORT = 55555 // The port to listen on
+    private lateinit var udpListener: UdpListener
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.i("RStreamClient", "MainMenuActivity: onCreate")
@@ -50,6 +53,37 @@ class MainMenuActivity : AppCompatActivity() {
         // 3. Set the retrieved text back into the EditText
         editText.setText(savedText)
         // -----------------------------------------------
+
+        // 1. Get WifiManager and Cast to WifiManager.
+        val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+        // 2. Initialize the listener
+        udpListener = UdpListener(UDP_PORT, wifiManager) { message, senderIp ->
+            // This is the callback for received packets.
+            // It runs on the Coroutine's IO dispatcher (background thread).
+
+            Log.i("UDP_RECEIVE", "Packet from $senderIp: $message")
+
+            // If you need to update the UI (e.g., a TextView), switch to the main thread:
+            /*
+            runOnUiThread {
+                 // update your TextView here
+                 myTextView.text = "Last received: $message from $senderIp"
+            }
+            */
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // 3. Start listening when the activity starts
+        udpListener.startListening()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // 4. Stop listening when the activity stops
+        udpListener.stopListening()
     }
 
     override fun onPause() {

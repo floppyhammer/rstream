@@ -4,6 +4,7 @@
 // Hide the console window.
 // #![windows_subsystem = "windows"]
 
+mod discovery;
 mod gui;
 mod input;
 mod stream;
