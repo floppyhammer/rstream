@@ -15,7 +15,7 @@ G_DECLARE_FINAL_TYPE(MyConnection, my_connection, MY, CONNECTION, GObject)
  *
  * @param websocket_uri The websocket URI to connect to. Ownership does not transfer (we copy it)
  */
-MyConnection *my_connection_new(const gchar *websocket_uri);
+MyConnection *my_connection_new(const gchar *websocket_uri, const gchar *target_address);
 
 /// Use a default websocket_uri.
 MyConnection *my_connection_new_localhost();

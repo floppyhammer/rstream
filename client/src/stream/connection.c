@@ -29,6 +29,7 @@ struct _MyConnection {
     GObject parent;
     SoupSession *soup_session;
     gchar *websocket_uri;
+    gchar *host_address;
 
     /// Cancellable for websocket connection process
     GCancellable *ws_cancel;
@@ -64,6 +65,7 @@ static guint signals[N_SIGNALS];
 
 typedef enum {
     PROP_WEBSOCKET_URI = 1,
+    PROP_HOST_ADDRESS,
     // PROP_STATUS,
     N_PROPERTIES
 } MyConnectionProperty;
@@ -82,6 +84,11 @@ static void my_connection_set_property(GObject *object, guint property_id, const
             g_free(self->websocket_uri);
             self->websocket_uri = g_value_dup_string(value);
             ALOGI("Websocket URI assigned: %s", self->websocket_uri);
+            break;
+        case PROP_HOST_ADDRESS:
+            g_free(self->host_address);
+            self->host_address = g_value_dup_string(value);
+            ALOGI("Host address assigned: %s", self->host_address);
             break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
@@ -107,7 +114,9 @@ static void my_connection_get_property(GObject *object, guint property_id, GValu
         case PROP_WEBSOCKET_URI:
             g_value_set_string(value, self->websocket_uri);
             break;
-
+        case PROP_HOST_ADDRESS:
+            g_value_set_string(value, self->host_address);
+            break;
         default:
             G_OBJECT_WARN_INVALID_PROPERTY_ID(object, property_id, pspec);
             break;
@@ -157,6 +166,15 @@ static void my_connection_class_init(MyConnectionClass *klass) {
                             "WebSocket URI",
                             "WebSocket URI for signaling server.",
                             DEFAULT_WEBSOCKET_URI /* default value */,
+                            G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+    g_object_class_install_property(
+        gobject_class,
+        PROP_HOST_ADDRESS,
+        g_param_spec_string("host-address",
+                            "",
+                            "",
+                            SERVER_ADDRESS /* default value */,
                             G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
     /**
@@ -501,7 +519,7 @@ static void conn_connect_internal(MyConnection *conn, enum my_status status) {
 
         ENetAddress address = {0};
         ENetPeer *peer = {0};
-        enet_address_set_host(&address, SERVER_ADDRESS);
+        enet_address_set_host(&address, conn->host_address);
         address.port = 7777;
 
         /* Initiate the connection, allocating the two channels 0 and 1. */
@@ -520,7 +538,7 @@ static void conn_connect_internal(MyConnection *conn, enum my_status status) {
 
 /* public (non-GObject) methods */
 
-MyConnection *my_connection_new(const gchar *websocket_uri) {
+MyConnection *my_connection_new(const gchar *websocket_uri, const gchar *host_address) {
     if (enet_initialize() != 0) {
         printf("An error occurred while initializing ENet.\n");
         abort();
@@ -528,7 +546,8 @@ MyConnection *my_connection_new(const gchar *websocket_uri) {
 
     ALOGI("New connection to: %s", websocket_uri);
 
-    MyConnection *conn = MY_CONNECTION(g_object_new(MY_TYPE_CONNECTION, "websocket-uri", websocket_uri, NULL));
+    MyConnection *conn = MY_CONNECTION(
+        g_object_new(MY_TYPE_CONNECTION, "websocket-uri", websocket_uri, "host-address", host_address, NULL));
 
     g_assert(os_thread_helper_init(&conn->enet_thread) >= 0);
 

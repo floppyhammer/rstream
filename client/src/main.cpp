@@ -352,7 +352,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
                                        state_.initialEglData->surface);
 
             std::string websocket_uri = "ws://" + state_.host_ip + ":5600/ws";
-            state_.connection = g_object_ref_sink(my_connection_new(websocket_uri.c_str()));
+            state_.connection = g_object_ref_sink(my_connection_new(websocket_uri.c_str(), state_.host_ip.c_str()));
 
             my_connection_connect(state_.connection);
 
