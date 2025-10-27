@@ -34,6 +34,7 @@ pub fn init_enigo() {
     });
 }
 
+// A function to initialize Vigem exactly once.
 pub fn init_vigem() {
     VIGEM_INIT.call_once(|| {
         // 1. Connect to the ViGEmBus driver service
@@ -88,6 +89,8 @@ pub async fn run_enet_server() -> Result<(), IoError> {
     task::spawn_blocking(|| -> () {
         let mut host = start_enet_server();
         let mut received_events = false;
+
+        println!("Running ENet loop");
 
         loop {
             while let Some(event) = host.service().unwrap() {
@@ -228,6 +231,9 @@ fn handle_enet_packet(packet: &enet::Packet) {
     let mut enigo_lock = ENIGO_GUARD.lock().unwrap();
     let enigo = enigo_lock.as_mut().expect("Enigo was not initialized!");
 
+    let mut gamepad_lock = GAMEPAD_GUARD.lock().unwrap();
+    let gamepad = gamepad_lock.as_mut().expect("Gamepad was not initialized!");
+
     match input_type {
         InputType::CursorLeftDown => {
             enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
@@ -263,6 +269,17 @@ fn handle_enet_packet(packet: &enet::Packet) {
         InputType::GamepadButtonX => {
             // Gamepad logic needs to be implemented here
             println!("Gamepad Button X");
+
+            let pressed = x > 0.0;
+            let button_to_set = vigem_client::XButtons::X;
+
+            if pressed {
+                // Set the bit for the A button (Button is pressed)
+                gamepad.buttons.raw |= button_to_set;
+            } else {
+                // Clear the bit for the A button (Button is released)
+                gamepad.buttons.raw &= !button_to_set;
+            }
         }
         InputType::GamepadLeftStick => {
             // Gamepad logic needs to be implemented here
@@ -272,5 +289,14 @@ fn handle_enet_packet(packet: &enet::Packet) {
             // Gamepad logic needs to be implemented here
             println!("Gamepad Right Stick ({}, {})", x, y);
         }
+    }
+
+    let mut vigem_lock = VIGEM_GUARD.lock().unwrap();
+    let vigem = vigem_lock.as_mut().expect("Vigem was not initialized!");
+
+    // Update the target
+    let result = vigem.update(&gamepad);
+    if let Err(e) = result {
+        eprintln!("Failed to update ViGEm target: {:?}", e);
     }
 }

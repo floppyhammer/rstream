@@ -50,7 +50,7 @@ fn init_gstreamer() {
     PIPELINE_INIT.call_once(|| {
         gst::init().unwrap();
         println!("GStreamer initialized.");
-        gst::log::set_default_threshold(gst::DebugLevel::Info);
+        gst::log::set_default_threshold(gst::DebugLevel::Warning);
     });
 }
 

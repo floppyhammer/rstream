@@ -75,7 +75,9 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
     int32_t key_code = AKeyEvent_getKeyCode(event);
 
     // 3. Process the action (DOWN, UP)
-    if (action == AKEY_EVENT_ACTION_DOWN) {
+    if (action == AKEY_EVENT_ACTION_DOWN || action == AKEY_EVENT_ACTION_UP) {
+        bool pressed = action == AKEY_EVENT_ACTION_DOWN;
+
         // Button was pressed
         switch (key_code) {
             case AKEYCODE_BUTTON_A:
@@ -85,7 +87,10 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                 ALOGI("Gamepad button B pressed");
                 break;
             case AKEYCODE_BUTTON_X: {
-                my_connection_send_input_event(state_.connection, static_cast<int>(InputType::GamepadButtonX), 0, 0);
+                my_connection_send_input_event(state_.connection,
+                                               static_cast<int>(InputType::GamepadButtonX),
+                                               pressed ? 1 : 0,
+                                               0);
 
                 ALOGI("Gamepad button X button pressed");
             } break;
@@ -102,10 +107,6 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                 ALOGI("Unhandled gamepad key pressed: %d", key_code);
                 break;
         }
-        return 1; // Event handled
-    } else if (action == AKEY_EVENT_ACTION_UP) {
-        // Button was released (optional: for non-instant actions)
-        // LOGI("Button released: %d", keyCode);
         return 1; // Event handled
     }
 
