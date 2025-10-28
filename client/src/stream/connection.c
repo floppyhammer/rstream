@@ -43,6 +43,7 @@ struct _MyConnection {
     ENetHost *client;
     ENetPeer *peer;
     struct os_thread_helper enet_thread;
+    GAsyncQueue *packet_queue;
 };
 
 G_DEFINE_TYPE(MyConnection, my_connection, G_TYPE_OBJECT)
@@ -441,6 +442,7 @@ void handle_enet_event(ENetEvent *event) {
     switch (event->type) {
         case ENET_EVENT_TYPE_RECEIVE: {
             ALOGI("ENet received a packet.");
+            enet_packet_destroy(event->packet);
         } break;
         case ENET_EVENT_TYPE_DISCONNECT: {
             ALOGI("ENet disconnected.");
@@ -466,6 +468,21 @@ static void *enet_thread_func(void *ptr) {
         if (!conn->client) {
             continue;
         }
+
+        ENetPacket *packet;
+
+        while ((packet = g_async_queue_try_pop(conn->packet_queue)) != NULL) {
+            int channel_id = 0;
+            int ret = enet_peer_send(conn->peer, channel_id, packet);
+            if (ret) {
+                ALOGE("enet_peer_send error: %d", ret);
+                // Destroy the packet because ENet didn't accept it.
+                enet_packet_destroy(packet);
+            }
+        }
+
+        // Flush the host to ensure the packet is sent immediately
+        enet_host_flush(conn->client);
 
         // Block for up to 10 milliseconds, or until an event occurs
         if (enet_host_service(conn->client, &event, 10) > 0) {
@@ -529,6 +546,8 @@ static void conn_connect_internal(MyConnection *conn, enum my_status status) {
             exit(EXIT_FAILURE);
         }
         conn->peer = peer;
+
+        conn->packet_queue = g_async_queue_new();
 
         int ret = os_thread_helper_start(&conn->enet_thread, &enet_thread_func, conn);
         (void)ret;
@@ -655,16 +674,8 @@ void my_connection_send_input_command_via_enet(MyConnection *conn, InputCommand 
     if (offset == COMMAND_SIZE) {
         ENetPacket *packet = enet_packet_create(buffer, COMMAND_SIZE, flag);
         if (packet) {
-            // peer is the ENetPeer* obtained from enet_host_connect()
-            // 0 is the channel ID you choose for input commands
-            int channel_id = 0;
-            int ret = enet_peer_send(conn->peer, channel_id, packet);
-            if (ret) {
-                ALOGE("enet_peer_send error: %d", ret);
-            }
-
-            // Flush the host to ensure the packet is sent immediately
-            enet_host_flush(conn->client);
+            // We cannot send it directly from here, as ENet is not thread safe.
+            g_async_queue_push(conn->packet_queue, packet);
         }
     } else {
         ALOGE("Wrong command size: %zu", offset);
