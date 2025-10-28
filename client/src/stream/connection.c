@@ -340,6 +340,9 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
         os_thread_helper_stop(&conn->enet_thread);
         ALOGI("ENet thread stopped.");
 
+        // Drop the queue after stopping the ENet thread.
+        g_async_queue_unref(conn->packet_queue);
+
         enet_host_destroy(conn->client);
         enet_deinitialize();
     }
@@ -547,7 +550,7 @@ static void conn_connect_internal(MyConnection *conn, enum my_status status) {
         }
         conn->peer = peer;
 
-        conn->packet_queue = g_async_queue_new();
+        conn->packet_queue = g_async_queue_new_full((GDestroyNotify)enet_packet_destroy);
 
         int ret = os_thread_helper_start(&conn->enet_thread, &enet_thread_func, conn);
         (void)ret;
