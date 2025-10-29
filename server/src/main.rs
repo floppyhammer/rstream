@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let icon = Icon::from_rgba(icon_data, 16, 16)?;
     let _tray_icon = TrayIconBuilder::new()
         .with_icon(icon)
-        .with_tooltip("My App")
+        .with_tooltip("RStream Client")
         .build()?;
 
     let app = gui::app::App::default();

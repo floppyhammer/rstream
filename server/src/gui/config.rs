@@ -6,6 +6,19 @@ const CONFIG_FILE: &str = "config.json";
 
 const DEFAULT_BITRATE: u32 = 8;
 
+use rand::Rng;
+
+pub(crate) fn generate_pin(length: usize) -> String {
+    let mut rng = rand::thread_rng();
+    let mut pin = String::new();
+
+    for _ in 0..length {
+        let digit = rng.gen_range(0..=9); // Generates a digit between 0 and 9 (inclusive)
+        pin.push_str(&digit.to_string());
+    }
+    pin
+}
+
 #[derive(PartialEq, Clone)]
 pub enum PeerManagementType {
     SinglePeer,
@@ -56,7 +69,7 @@ pub struct Config {
 impl Config {
     pub fn new() -> Self {
         let peer_management_type = PeerManagementType::SinglePeer;
-        let pin = "".to_string();
+        let pin = generate_pin(4);
 
         Self {
             bitrate: DEFAULT_BITRATE,
