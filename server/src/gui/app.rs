@@ -18,6 +18,7 @@ use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{str, thread};
+use tray_icon::menu::{MenuEvent, MenuEventReceiver, MenuId};
 
 enum BuildStatus {
     None,
@@ -43,6 +44,8 @@ pub struct App {
 
     sender: Arc<Mutex<Sender<(String, bool)>>>,
     receiver: Receiver<(String, bool)>,
+
+    pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
 
 impl Default for App {
@@ -88,6 +91,7 @@ impl Default for App {
 
             sender: Arc::new(Mutex::new(sender)),
             receiver,
+            tray_menu_quit_id: None,
         }
     }
 }
@@ -96,6 +100,21 @@ impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let menu_channel = MenuEvent::receiver();
+        // Use try_recv() for non-blocking check
+        if let Ok(event) = menu_channel.try_recv() {
+            // Handle the menu click event
+
+            // event.id() returns a reference (&MenuId), so we compare it to a reference
+            match event.id() {
+                id if id == self.tray_menu_quit_id.as_ref().unwrap() => {
+                    println!("Tray Menu Event: Quit selected. Shutting down.");
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                &_ => {}
+            }
+        }
+
         let Self {
             option1_enabled,
             option2_enabled,
