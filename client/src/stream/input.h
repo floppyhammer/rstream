@@ -8,8 +8,21 @@ typedef enum : uint8_t {
     CursorMove,
     CursorScroll,
     GamepadButtonX,
+    GamepadButtonY,
+    GamepadButtonA,
+    GamepadButtonB,
+    GamepadButtonL1,
+    GamepadButtonR1,
+    GamepadButtonL2,
+    GamepadButtonR2,
+    GamepadUp,
+    GamepadDown,
+    GamepadLeft,
+    GamepadRight,
     GamepadLeftStick,
     GamepadRightStick,
+    GamepadButtonStart,
+    GamepadButtonSelect,
 } InputType;
 
 #pragma pack(push, 1)

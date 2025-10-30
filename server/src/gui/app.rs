@@ -243,15 +243,15 @@ impl eframe::App for App {
                         }
                     });
 
-                ui.add_space(8.0);
+                // ui.add_space(8.0);
 
                 // The central panel the region left after adding TopPanel's and SidePanel's
-                ui.heading("Logs");
-
-                ScrollArea::vertical().show(ui, |ui| {
-                    let output = TextEdit::multiline(terminal_output).interactive(true);
-                    ui.add(output);
-                });
+                // ui.heading("Logs");
+                //
+                // ScrollArea::vertical().show(ui, |ui| {
+                //     let output = TextEdit::multiline(terminal_output).interactive(true);
+                //     ui.add(output);
+                // });
 
                 match self.receiver.try_recv() {
                     Ok(value) => {
