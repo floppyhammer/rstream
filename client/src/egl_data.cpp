@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 #include "stream/gst_common.h"
-#include "stream/render/GLError.h"
+#include "stream/render/gl_error.h"
 
 #define MAX_CONFIGS 1024
 

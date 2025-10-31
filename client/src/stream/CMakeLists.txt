@@ -3,9 +3,9 @@ add_library(
         stream_app.c
         connection.c
         thread.c
-        render/GLDebug.cpp
-        render/GLError.cpp
-        render/GLSwapchain.cpp
+        render/gl_debug.cpp
+        render/gl_error.cpp
+        render/gl_swapchain.cpp
         render/render.cpp
 )
 
