@@ -7,9 +7,10 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.edit
 import androidx.databinding.DataBindingUtil
 import com.gst.android.demo.databinding.ActivityMainMenuBinding
-import androidx.core.content.edit
+
 
 class MainMenuActivity : AppCompatActivity() {
     private lateinit var editText: EditText
@@ -75,18 +76,24 @@ class MainMenuActivity : AppCompatActivity() {
     }
 
     override fun onStart() {
+        Log.i("RStreamClient", "MainMenuActivity: onStart")
+
         super.onStart()
-        // 3. Start listening when the activity starts
+
         udpListener.startListening()
     }
 
     override fun onStop() {
+        Log.i("RStreamClient", "MainMenuActivity: onStop")
+
         super.onStop()
-        // 4. Stop listening when the activity stops
+
         udpListener.stopListening()
     }
 
     override fun onPause() {
+        Log.i("RStreamClient", "MainMenuActivity: onPause")
+
         super.onPause()
 
         // Get a reference to the SharedPreferences file
@@ -102,5 +109,15 @@ class MainMenuActivity : AppCompatActivity() {
         Log.i("RStreamClient", "MainMenuActivity: onDestroy")
 
         super.onDestroy()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (resultCode == RESULT_OK) {
+            // 🔑 Process the data from the 'data' intent here
+//            val receivedValue = data.getStringExtra("key")
+            // Update UI based on receivedValue
+        }
     }
 }

@@ -314,27 +314,34 @@ void my_connection_disconnect(MyConnection *conn) {
     if (conn->peer) {
         enet_peer_disconnect(conn->peer, 0);
 
-        ENetEvent event = {0};
+        // Graceful shutdown
+        if (0) {
+            ENetEvent event = {0};
 
-        uint8_t disconnected = false;
+            uint8_t disconnected = false;
 
-        /* Allow up to 3 seconds for the disconnect to succeed
-         * and drop any packets received packets.
-         */
-        while (enet_host_service(conn->client, &event, 3000) > 0) {
-            switch (event.type) {
-                case ENET_EVENT_TYPE_RECEIVE: {
-                    enet_packet_destroy(event.packet);
-                } break;
-                case ENET_EVENT_TYPE_DISCONNECT: {
-                    ALOGI("ENet disconnected.");
-                    disconnected = true;
-                } break;
+            /* Allow up to 3 seconds for the disconnect to succeed
+             * and drop any packets received packets.
+             */
+            while (enet_host_service(conn->client, &event, 3000) > 0) {
+                switch (event.type) {
+                    case ENET_EVENT_TYPE_RECEIVE: {
+                        enet_packet_destroy(event.packet);
+                    } break;
+                    case ENET_EVENT_TYPE_DISCONNECT: {
+                        ALOGI("ENet disconnected.");
+                        disconnected = true;
+                    } break;
+                }
+            }
+
+            // Drop connection, since disconnection didn't succeed.
+            if (!disconnected) {
+                enet_peer_reset(conn->peer);
             }
         }
-
-        // Drop connection, since disconnection didn't succeed.
-        if (!disconnected) {
+        // Quick shutdown
+        else {
             enet_peer_reset(conn->peer);
         }
 

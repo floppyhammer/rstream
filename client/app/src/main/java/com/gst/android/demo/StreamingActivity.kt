@@ -48,6 +48,24 @@ class StreamingActivity : NativeActivity() {
         super.onWindowFocusChanged(hasFocus)
     }
 
+    override fun onStart() {
+        Log.i("RStreamClient", "StreamingActivity: onStart")
+
+        super.onStart()
+    }
+
+    override fun onPause() {
+        Log.i("RStreamClient", "StreamingActivity: onPause")
+
+        super.onPause()
+    }
+
+    override fun onStop() {
+        Log.i("RStreamClient", "StreamingActivity: onStop")
+
+        super.onStop()
+    }
+
     override fun onDestroy() {
         Log.i("RStreamClient", "StreamingActivity: onDestroy")
 
