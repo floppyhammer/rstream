@@ -248,6 +248,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             } break;
             default: {
                 ALOGI("Gamepad Unhandled key: %d", key_code);
+                return 0;
             } break;
         }
         return 1; // Event handled
