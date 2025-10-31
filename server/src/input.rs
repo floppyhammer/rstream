@@ -161,8 +161,21 @@ enum InputType {
     CursorMove = 4,
     CursorScroll = 5,
     GamepadButtonX = 6,
-    GamepadLeftStick = 7,
-    GamepadRightStick = 8,
+    GamepadButtonY = 7,
+    GamepadButtonA = 8,
+    GamepadButtonB = 9,
+    GamepadButtonL1 = 10,
+    GamepadButtonR1 = 11,
+    GamepadButtonL2 = 12,
+    GamepadButtonR2 = 13,
+    GamepadButtonUp = 14,
+    GamepadButtonDown = 15,
+    GamepadButtonLeft = 16,
+    GamepadButtonRight = 17,
+    GamepadLeftStick = 18,
+    GamepadRightStick = 19,
+    GamepadButtonStart = 20,
+    GamepadButtonSelect = 21,
 }
 
 impl TryFrom<u8> for InputType {
@@ -177,8 +190,21 @@ impl TryFrom<u8> for InputType {
             4 => Ok(InputType::CursorMove),
             5 => Ok(InputType::CursorScroll),
             6 => Ok(InputType::GamepadButtonX),
-            7 => Ok(InputType::GamepadLeftStick),
-            8 => Ok(InputType::GamepadRightStick),
+            7 => Ok(InputType::GamepadButtonY),
+            8 => Ok(InputType::GamepadButtonA),
+            9 => Ok(InputType::GamepadButtonB),
+            10 => Ok(InputType::GamepadButtonL1),
+            11 => Ok(InputType::GamepadButtonR1),
+            12 => Ok(InputType::GamepadButtonL2),
+            13 => Ok(InputType::GamepadButtonR2),
+            14 => Ok(InputType::GamepadButtonUp),
+            15 => Ok(InputType::GamepadButtonDown),
+            16 => Ok(InputType::GamepadButtonLeft),
+            17 => Ok(InputType::GamepadButtonRight),
+            18 => Ok(InputType::GamepadLeftStick),
+            19 => Ok(InputType::GamepadRightStick),
+            20 => Ok(InputType::GamepadButtonStart),
+            21 => Ok(InputType::GamepadButtonSelect),
             _ => Err("Invalid integer for MyEnum"),
         }
     }
@@ -234,6 +260,9 @@ fn handle_enet_packet(packet: &enet::Packet) {
     let mut gamepad_lock = GAMEPAD_GUARD.lock().unwrap();
     let gamepad = gamepad_lock.as_mut().expect("Gamepad was not initialized!");
 
+    let mut pressed = false;
+    let mut button_to_set = None;
+
     match input_type {
         InputType::CursorLeftDown => {
             enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
@@ -267,27 +296,111 @@ fn handle_enet_packet(packet: &enet::Packet) {
             enigo.button(Button::Right, Click).unwrap();
         }
         InputType::GamepadButtonX => {
+            println!("Gamepad button X");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::X);
+        }
+        InputType::GamepadButtonY => {
+            println!("Gamepad button Y");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::Y);
+        }
+        InputType::GamepadButtonA => {
+            println!("Gamepad button A");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::A);
+        }
+        InputType::GamepadButtonB => {
+            println!("Gamepad button B");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::B);
+        }
+        InputType::GamepadButtonL1 => {
+            println!("Gamepad button L1");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::LB);
+        }
+        InputType::GamepadButtonR1 => {
+            println!("Gamepad button R1");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::RB);
+        }
+        InputType::GamepadButtonL2 => {
+            println!("Gamepad button L1");
+
+            gamepad.left_trigger = (x * 256.0) as u8;
+        }
+        InputType::GamepadButtonR2 => {
+            println!("Gamepad button R2");
+
+            gamepad.right_trigger = (x * 256.0) as u8;
+        }
+        InputType::GamepadButtonStart => {
+            println!("Gamepad button START");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::START);
+        }
+        InputType::GamepadButtonSelect => {
+            println!("Gamepad button SELECT");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::BACK);
+        }
+        InputType::GamepadButtonUp => {
+            println!("Gamepad button UP");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::UP);
+        }
+        InputType::GamepadButtonDown => {
             // Gamepad logic needs to be implemented here
-            println!("Gamepad Button X");
+            println!("Gamepad button DOWN");
 
-            let pressed = x > 0.0;
-            let button_to_set = vigem_client::XButtons::X;
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::DOWN);
+        }
+        InputType::GamepadButtonLeft => {
+            // Gamepad logic needs to be implemented here
+            println!("Gamepad button LEFT");
 
-            if pressed {
-                // Set the bit for the A button (Button is pressed)
-                gamepad.buttons.raw |= button_to_set;
-            } else {
-                // Clear the bit for the A button (Button is released)
-                gamepad.buttons.raw &= !button_to_set;
-            }
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::LEFT);
+        }
+        InputType::GamepadButtonRight => {
+            // Gamepad logic needs to be implemented here
+            println!("Gamepad button RIGHT");
+
+            pressed = x > 0.0;
+            button_to_set = Some(vigem_client::XButtons::RIGHT);
         }
         InputType::GamepadLeftStick => {
-            // Gamepad logic needs to be implemented here
             println!("Gamepad Left Stick ({}, {})", x, y);
+
+            gamepad.thumb_lx = (x * 32767.0) as i16;
+            gamepad.thumb_ly = (y * -32767.0) as i16;
         }
         InputType::GamepadRightStick => {
-            // Gamepad logic needs to be implemented here
             println!("Gamepad Right Stick ({}, {})", x, y);
+
+            gamepad.thumb_rx = (x * 32767.0) as i16;
+            gamepad.thumb_ry = (y * -32767.0) as i16;
+        }
+    }
+
+    if let Some(button) = button_to_set {
+        if pressed {
+            // Set the bit for the A button (Button is pressed)
+            gamepad.buttons.raw |= button;
+        } else {
+            // Clear the bit for the A button (Button is released)
+            gamepad.buttons.raw &= !button;
         }
     }
 

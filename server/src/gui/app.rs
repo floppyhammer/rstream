@@ -18,6 +18,7 @@ use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{str, thread};
+use tray_icon::menu::{MenuEvent, MenuEventReceiver, MenuId};
 
 enum BuildStatus {
     None,
@@ -43,6 +44,8 @@ pub struct App {
 
     sender: Arc<Mutex<Sender<(String, bool)>>>,
     receiver: Receiver<(String, bool)>,
+
+    pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
 
 impl Default for App {
@@ -88,6 +91,7 @@ impl Default for App {
 
             sender: Arc::new(Mutex::new(sender)),
             receiver,
+            tray_menu_quit_id: None,
         }
     }
 }
@@ -96,6 +100,21 @@ impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let menu_channel = MenuEvent::receiver();
+        // Use try_recv() for non-blocking check
+        if let Ok(event) = menu_channel.try_recv() {
+            // Handle the menu click event
+
+            // event.id() returns a reference (&MenuId), so we compare it to a reference
+            match event.id() {
+                id if id == self.tray_menu_quit_id.as_ref().unwrap() => {
+                    println!("Tray Menu Event: Quit selected. Shutting down.");
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+                &_ => {}
+            }
+        }
+
         let Self {
             option1_enabled,
             option2_enabled,
@@ -124,143 +143,152 @@ impl eframe::App for App {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ScrollArea::vertical()
-                .auto_shrink([true; 2])
-                .show_viewport(ui, |ui, _| {
-                    CollapsingHeader::new("Connected Peers")
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+            ScrollArea::vertical().show_viewport(ui, |ui, _| {
+                ui.horizontal(|ui| {
+                    ui.label("PIN");
 
-                            if let Some(state) = guard.as_mut() {
-                                for p in &state.peers {
-                                    ui.horizontal(|ui| {
-                                        ui.label(format!("(1) IP: {}", p.1.ip));
-                                        ui.label(format!("Time connected: {}", p.1.time_connected));
-                                        ui.button("Disconnect");
-                                    });
-                                }
-                            }
-                        });
+                    ui.add_enabled(
+                        false,
+                        TextEdit::singleline(&mut self.config.pin).desired_width(32.0),
+                    );
 
-                    ui.add_space(8.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label("PIN");
-
-                        if ui.text_edit_singleline(&mut self.config.pin).changed() {}
-
-                        // if ui.button("Open…").clicked() {
-                        //     if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                        //         self.config.pin = path.display().to_string();
-                        //     }
-                        // }
-                    });
-
-                    ui.add_space(8.0);
-
-                    ui.horizontal(|ui| {
-                        ui.label("Bitrate (Mbps)");
-                        ui.add(
-                            DragValue::new(&mut self.config.bitrate)
-                                .clamp_range(RangeInclusive::new(1, 100)),
-                        );
-                    });
-
-                    ui.add_space(8.0);
-
-                    CollapsingHeader::new("Peer management type")
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            ui.radio_value(
-                                &mut self.config.peer_management_type,
-                                PeerManagementType::SinglePeer,
-                                PeerManagementType::SinglePeer.to_string(),
-                            );
-                            ui.radio_value(
-                                &mut self.config.peer_management_type,
-                                PeerManagementType::MultiplePeersSingleControl,
-                                PeerManagementType::MultiplePeersSingleControl.to_string(),
-                            );
-                            ui.radio_value(
-                                &mut self.config.peer_management_type,
-                                PeerManagementType::MultiplePeersMultipleControl,
-                                PeerManagementType::MultiplePeersMultipleControl.to_string(),
-                            );
-
-                            // Add tooltip.
-                            if ui.ui_contains_pointer() {
-                                egui::show_tooltip(
-                                    ui.ctx(),
-                                    egui::Id::new("peer_management_tooltip"),
-                                    |ui| {
-                                        ui.label("Manage peers");
-                                    },
-                                );
-                            }
-                        });
-
-                    ui.add_space(8.0);
-
-                    CollapsingHeader::new("Extra options")
-                        .default_open(true)
-                        .show(ui, |ui| {
-                            ui.checkbox(option1_enabled, "option1");
-                            ui.checkbox(option2_enabled, "option2");
-                        });
-
-                    ui.add_space(8.0);
-
-                    if ui.button("Host").clicked() {
-                        println!("Host");
+                    if ui.button("Regenerate").clicked() {
+                        self.config.pin = crate::gui::config::generate_pin(4);
                     }
 
-                    ui.add_space(8.0);
-
-                    // The central panel the region left after adding TopPanel's and SidePanel's
-                    ui.heading("Logs");
-
-                    ScrollArea::vertical().show(ui, |ui| {
-                        let output = TextEdit::multiline(terminal_output).interactive(true);
-                        ui.add(output);
-                    });
-
-                    match self.receiver.try_recv() {
-                        Ok(value) => {
-                            let (output_string, res) = value;
-
-                            if res {
-                                // Update the count of the pending cmds.
-                                self.pending_cmd_count -= 1;
-
-                                // All cmds have finished successfully. Build succeeds.
-                                if self.pending_cmd_count == 0 {
-                                    *build_status = BuildStatus::Success;
-                                }
-                            } else {
-                                // If any cmd fails, the build fails.
-                                // And clear pending cmds.
-                                *build_status = BuildStatus::Fail;
-                                self.pending_cmd_count = 0;
-                            }
-
-                            terminal_output.push_str(&output_string);
-                        }
-                        Err(_) => {}
-                    }
-
-                    match build_status {
-                        BuildStatus::None => {
-                            ui.colored_label(Color32::YELLOW, "");
-                        }
-                        BuildStatus::Success => {
-                            ui.colored_label(Color32::GREEN, "Build succeeded.");
-                        }
-                        BuildStatus::Fail => {
-                            ui.colored_label(Color32::RED, "Build failed!");
-                        }
+                    if ui.ui_contains_pointer() {
+                        egui::show_tooltip(ui.ctx(), egui::Id::new("pin_tooltip"), |ui| {
+                            ui.label("Enter this when connecting from client side.");
+                        });
                     }
                 });
+
+                ui.add_space(8.0);
+
+                ui.horizontal(|ui| {
+                    ui.label(format!("Bitrate (Mbps): {}", self.config.bitrate));
+
+                    if ui.ui_contains_pointer() {
+                        egui::show_tooltip(ui.ctx(), egui::Id::new("bitrate_tooltip"), |ui| {
+                            ui.label("Change bitrate from client side.");
+                        });
+                    }
+                });
+
+                ui.add_space(8.0);
+
+                CollapsingHeader::new("Peer management type")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.radio_value(
+                            &mut self.config.peer_management_type,
+                            PeerManagementType::SinglePeer,
+                            PeerManagementType::SinglePeer.to_string(),
+                        );
+                        ui.radio_value(
+                            &mut self.config.peer_management_type,
+                            PeerManagementType::MultiplePeersSingleControl,
+                            PeerManagementType::MultiplePeersSingleControl.to_string(),
+                        );
+                        ui.radio_value(
+                            &mut self.config.peer_management_type,
+                            PeerManagementType::MultiplePeersMultipleControl,
+                            PeerManagementType::MultiplePeersMultipleControl.to_string(),
+                        );
+
+                        // Add tooltip.
+                        if ui.ui_contains_pointer() {
+                            egui::show_tooltip(
+                                ui.ctx(),
+                                egui::Id::new("peer_management_tooltip"),
+                                |ui| {
+                                    ui.label("Manage peers");
+                                },
+                            );
+                        }
+                    });
+
+                ui.add_space(8.0);
+
+                CollapsingHeader::new("Host settings")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.checkbox(option1_enabled, "Start hosting upon app startup");
+                        ui.checkbox(option2_enabled, "option2");
+                    });
+
+                ui.add_space(8.0);
+
+                if ui.button("Host").clicked() {
+                    println!("Host");
+                }
+
+                ui.add_space(8.0);
+
+                CollapsingHeader::new("Connected Peers")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+
+                        if let Some(state) = guard.as_mut() {
+                            for p in &state.peers {
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("(1) IP: {}", p.1.ip));
+                                    ui.label(format!("Time connected: {}", p.1.time_connected));
+                                    if ui.button("Disconnect").clicked() {
+                                        println!("Disconnect");
+                                    };
+                                });
+                            }
+                        }
+                    });
+
+                // ui.add_space(8.0);
+
+                // The central panel the region left after adding TopPanel's and SidePanel's
+                // ui.heading("Logs");
+                //
+                // ScrollArea::vertical().show(ui, |ui| {
+                //     let output = TextEdit::multiline(terminal_output).interactive(true);
+                //     ui.add(output);
+                // });
+
+                match self.receiver.try_recv() {
+                    Ok(value) => {
+                        let (output_string, res) = value;
+
+                        if res {
+                            // Update the count of the pending cmds.
+                            self.pending_cmd_count -= 1;
+
+                            // All cmds have finished successfully. Build succeeds.
+                            if self.pending_cmd_count == 0 {
+                                *build_status = BuildStatus::Success;
+                            }
+                        } else {
+                            // If any cmd fails, the build fails.
+                            // And clear pending cmds.
+                            *build_status = BuildStatus::Fail;
+                            self.pending_cmd_count = 0;
+                        }
+
+                        terminal_output.push_str(&output_string);
+                    }
+                    Err(_) => {}
+                }
+
+                match build_status {
+                    BuildStatus::None => {
+                        ui.colored_label(Color32::YELLOW, "");
+                    }
+                    BuildStatus::Success => {
+                        ui.colored_label(Color32::GREEN, "Build succeeded.");
+                    }
+                    BuildStatus::Fail => {
+                        ui.colored_label(Color32::RED, "Build failed!");
+                    }
+                }
+            });
         });
 
         // Override reactive mode.

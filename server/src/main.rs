@@ -10,8 +10,12 @@ mod input;
 mod stream;
 
 use eframe::egui::{Style, Visuals};
+use eframe::epaint::image;
+use std::env;
+use std::process::id;
 use std::sync::Mutex;
-use tray_icon::{Icon, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent, TrayIconId};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOWDEFAULT};
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -24,18 +28,25 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 static VISIBLE: Mutex<bool> = Mutex::new(true);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut icon_data: Vec<u8> = Vec::with_capacity(16 * 16 * 4);
-    for _ in 0..256 {
-        // all red
-        icon_data.extend_from_slice(&[255, 0, 0, 255]);
-    }
-    let icon = Icon::from_rgba(icon_data, 16, 16)?;
+    let asset_dir = std::path::Path::new(env!("OUT_DIR")).join("assets");
+    let icon = Icon::from_path(asset_dir.join("favicon.ico"), None)?;
+
+    let quit_item = MenuItem::new("Quit", true, None);
+    // Store the MenuIds for easy comparison later
+    let quit_id = quit_item.id().clone();
+
+    let tray_menu = Menu::new();
+    tray_menu.append(&quit_item).unwrap();
+
     let _tray_icon = TrayIconBuilder::new()
         .with_icon(icon)
-        .with_tooltip("My App")
+        .with_tooltip("RStream Client")
+        .with_menu(Box::new(tray_menu))
         .build()?;
 
-    let app = gui::app::App::default();
+    let mut app = gui::app::App::default();
+
+    app.tray_menu_quit_id = Some(quit_id);
 
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
@@ -67,6 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 match event {
                     TrayIconEvent::Click {
                         button_state: MouseButtonState::Down,
+                        button: MouseButton::Left,
                         ..
                     } => {
                         let mut visible = VISIBLE.lock().unwrap();
@@ -89,6 +101,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     _ => return,
                 }
+
+                let event_id = event.id().clone();
+
+                // match event_id {
+                //     // Compare the event's ID with the stored IDs
+                //     id if id == quit_id => {
+                //         println!("Quit clicked! Exiting application.");
+                //         // Add your application cleanup and exit code here
+                //         break;
+                //     }
+                //     id if id == about_id => {
+                //         println!("About clicked! Showing info.");
+                //         // Add logic to show an 'About' window or dialog
+                //     }
+                //     _ => {
+                //         // Handle any other potential menu items
+                //         println!("Unknown menu item clicked with ID: {:?}", event.id());
+                //     }
+                // }
             }));
 
             Box::new(app)
