@@ -10,7 +10,6 @@ const BROADCAST_PORT: u16 = 55555;
 // Standard broadcast address for the local network.
 const BROADCAST_ADDRESS: Ipv4Addr = Ipv4Addr::new(192, 168, 3, 255);
 const ANNOUNCE_INTERVAL_SECONDS: u64 = 2;
-const DISCOVERY_MESSAGE: &str = "GAME_STREAM_SERVER:5600";
 
 pub(crate) async fn run_announcer() -> Result<(), IoError> {
     task::spawn_blocking(|| -> io::Result<()> {
@@ -22,14 +21,18 @@ pub(crate) async fn run_announcer() -> Result<(), IoError> {
         // This is required to send packets to 255.255.255.255
         socket.set_broadcast(true)?;
 
+        let broadcast_target = (BROADCAST_ADDRESS, BROADCAST_PORT);
+
+        let hostname = gethostname::gethostname();
+        let message = format!("{}:5600", hostname.to_str().unwrap());
+
         println!("Game Stream Server Announcer Started.");
         println!(
             "Sending: '{}' every {} seconds to {}:{}",
-            DISCOVERY_MESSAGE, ANNOUNCE_INTERVAL_SECONDS, BROADCAST_ADDRESS, BROADCAST_PORT
+            message, ANNOUNCE_INTERVAL_SECONDS, BROADCAST_ADDRESS, BROADCAST_PORT
         );
 
-        let broadcast_target = (BROADCAST_ADDRESS, BROADCAST_PORT);
-        let message_bytes = DISCOVERY_MESSAGE.as_bytes();
+        let message_bytes = message.as_bytes();
 
         loop {
             // 3. Send the broadcast packet
