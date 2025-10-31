@@ -16,42 +16,35 @@
 
 #include "connection.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif // __cplusplus
+G_BEGIN_DECLS
 
 struct MySample;
 
-typedef struct _StreamApp StreamApp;
+#define MY_TYPE_STREAM_APP my_stream_app_get_type()
+
+G_DECLARE_FINAL_TYPE(MyStreamApp, my_stream_app, MY, STREAM_APP, GObject)
 
 /*!
  * Create a stream client object, providing the connection object
  *
  * @memberof StreamApp
  */
-StreamApp *stream_app_new();
+MyStreamApp *my_stream_app_new();
 
 /// Initialize the EGL context and surface.
-void stream_app_set_egl_context(StreamApp *app, EGLContext context, EGLDisplay display, EGLSurface surface);
+void stream_app_set_egl_context(MyStreamApp *app, EGLContext context, EGLDisplay display, EGLSurface surface);
 
 /*!
  * Start the GMainLoop embedded in this object in a new thread
  *
  * @param connection The connection to use
  */
-void stream_app_spawn_thread(StreamApp *app, MyConnection *connection);
+void stream_app_spawn_thread(MyStreamApp *app, MyConnection *connection);
 
 /*!
  * Stop the pipeline and the mainloop thread.
  */
-void stream_app_stop(StreamApp *app);
-
-/*!
- * Clear a pointer and free the associate stream client, if any.
- *
- * Handles null checking for you.
- */
-void stream_app_destroy(StreamApp **ptr_app);
+void stream_app_stop(MyStreamApp *app);
 
 /*!
  * Attempt to retrieve a sample, if one has been decoded.
@@ -61,17 +54,15 @@ void stream_app_destroy(StreamApp **ptr_app);
 * @param app self
 * @param[out] out_decode_end struct to populate with decode-end time.
  */
-struct MySample *stream_app_try_pull_sample(StreamApp *app, struct timespec *out_decode_end);
+struct MySample *stream_app_try_pull_sample(MyStreamApp *app, struct timespec *out_decode_end);
 
 /*!
  * Release a sample returned from @ref stream_app_try_pull_sample
  */
-void stream_app_release_sample(StreamApp *app, struct MySample *ems);
+void stream_app_release_sample(MyStreamApp *app, struct MySample *ems);
 
-uint32_t stream_app_get_video_width(StreamApp *app);
+uint32_t stream_app_get_video_width(MyStreamApp *app);
 
-uint32_t stream_app_get_video_height(StreamApp *app);
+uint32_t stream_app_get_video_height(MyStreamApp *app);
 
-#ifdef __cplusplus
-} // extern "C"
-#endif // __cplusplus
+G_END_DECLS

@@ -1,13 +1,3 @@
-// Copyright 2020-2023, Collabora, Ltd.
-// Copyright 2022-2023, PlutoVR
-// SPDX-License-Identifier: BSL-1.0
-/*!
- * @file
- * @brief  Pipeline module ElectricMaple XR streaming solution
- * @author Rylie Pavlik <rpavlik@collabora.com>
- * @ingroup em_client
- */
-
 #include "stream_app.h"
 
 #include <gst/app/gstappsink.h>
@@ -21,7 +11,6 @@
 #include <gst/gstsample.h>
 #include <gst/gstutils.h>
 #include <gst/video/video-frame.h>
-#include <gst/webrtc/webrtc.h>
 
 #include "connection.h"
 #include "gst_common.h"
@@ -44,7 +33,9 @@ struct MySampleImpl {
     GstSample *sample;
 };
 
-struct _StreamApp {
+struct _MyStreamApp {
+    GObject parent;
+
     GMainLoop *loop;
     MyConnection *connection;
     GstElement *pipeline;
@@ -86,6 +77,8 @@ struct _StreamApp {
     guint timeout_src_id_print_stats;
 };
 
+G_DEFINE_TYPE(MyStreamApp, my_stream_app, G_TYPE_OBJECT)
+
 // clang-format off
 #define VIDEO_SINK_CAPS \
     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY "), "              \
@@ -102,14 +95,14 @@ struct _StreamApp {
 
 static void *stream_app_thread_func(void *ptr);
 
-static void my_stream_client_set_connection(StreamApp *app, MyConnection *connection);
+static void stream_client_set_connection(MyStreamApp *app, MyConnection *connection);
 
 /* GObject method implementations */
 
-static void stream_app_init(StreamApp *app) {
+static void my_stream_app_init(MyStreamApp *app) {
     ALOGI("%s: creating stuff", __FUNCTION__);
 
-    memset(app, 0, sizeof(StreamApp));
+    memset(app, 0, sizeof(MyStreamApp));
 
     app->loop = g_main_loop_new(NULL, FALSE);
 
@@ -119,7 +112,29 @@ static void stream_app_init(StreamApp *app) {
     ALOGI("%s: done creating stuff", __FUNCTION__);
 }
 
-void stream_app_set_egl_context(StreamApp *app, EGLContext context, EGLDisplay display, EGLSurface surface) {
+static void stream_app_finalize(GObject *gobject) {
+    MyStreamApp *app = MY_STREAM_APP(gobject);
+
+    gst_clear_object(&app->sample);
+    gst_clear_object(&app->pipeline);
+    gst_clear_object(&app->gst_gl_display);
+    gst_clear_object(&app->gst_gl_context);
+    gst_clear_object(&app->gst_gl_other_context);
+    gst_clear_object(&app->display);
+    gst_clear_object(&app->context);
+    gst_clear_object(&app->appsink);
+
+    G_OBJECT_CLASS(my_stream_app_parent_class)->finalize(gobject);
+}
+
+static void my_stream_app_class_init(MyStreamAppClass *klass) {
+    GObjectClass *gobject_class = G_OBJECT_CLASS(klass);
+    gobject_class->finalize = stream_app_finalize;
+}
+
+/* ---------------------------------- */
+
+void stream_app_set_egl_context(MyStreamApp *app, EGLContext context, EGLDisplay display, EGLSurface surface) {
     ALOGI("Wrapping egl context");
 
     app->egl.display = display;
@@ -138,7 +153,7 @@ void stream_app_set_egl_context(StreamApp *app, EGLContext context, EGLDisplay d
  * Callbacks
  */
 
-static GstBusSyncReply bus_sync_handler_cb(GstBus *bus, GstMessage *msg, StreamApp *app) {
+static GstBusSyncReply bus_sync_handler_cb(GstBus *bus, GstMessage *msg, MyStreamApp *app) {
     // LOG_MSG(msg);
 
     /* Do not let GstGL retrieve the display handle on its own
@@ -196,7 +211,7 @@ static gboolean gst_bus_cb(GstBus *bus, GstMessage *message, gpointer user_data)
 }
 
 static GstFlowReturn on_new_sample_cb(GstAppSink *appsink, gpointer user_data) {
-    StreamApp *app = (StreamApp *)user_data;
+    MyStreamApp *app = (MyStreamApp *)user_data;
 
     // TODO record the frame ID, get frame pose
     struct timespec ts;
@@ -229,7 +244,7 @@ static GstFlowReturn on_new_sample_cb(GstAppSink *appsink, gpointer user_data) {
     return GST_FLOW_OK;
 }
 
-static gboolean print_stats(StreamApp *app) {
+static gboolean print_stats(MyStreamApp *app) {
     if (!app) {
         return G_SOURCE_CONTINUE;
     }
@@ -260,7 +275,7 @@ static gboolean print_stats(StreamApp *app) {
     return G_SOURCE_CONTINUE;
 }
 
-static gboolean check_pipeline_dot_data(StreamApp *app) {
+static gboolean check_pipeline_dot_data(MyStreamApp *app) {
     if (!app || !app->pipeline) {
         return G_SOURCE_CONTINUE;
     }
@@ -271,7 +286,7 @@ static gboolean check_pipeline_dot_data(StreamApp *app) {
     return G_SOURCE_CONTINUE;
 }
 
-static void drop_pipeline(StreamApp *app) {
+static void drop_pipeline(MyStreamApp *app) {
     if (app->pipeline) {
         gst_element_set_state(app->pipeline, GST_STATE_NULL);
     }
@@ -280,7 +295,7 @@ static void drop_pipeline(StreamApp *app) {
 }
 
 static void *stream_app_thread_func(void *ptr) {
-    StreamApp *app = (StreamApp *)ptr;
+    MyStreamApp *app = (MyStreamApp *)ptr;
 
     ALOGI("%s: running GMainLoop", __FUNCTION__);
 
@@ -291,25 +306,26 @@ static void *stream_app_thread_func(void *ptr) {
     return NULL;
 }
 
-/*
- * Public functions
- */
+/* --------------- Public functions -------------- */
 
-StreamApp *stream_app_new() {
-    StreamApp *self = calloc(1, sizeof(StreamApp));
-    stream_app_init(self);
+MyStreamApp *my_stream_app_new() {
+    MyStreamApp *self = MY_STREAM_APP(g_object_new(MY_TYPE_STREAM_APP, NULL));
+    if (self == NULL) {
+        ALOGE("%s: g_object_new failed to allocate", __FUNCTION__);
+        return NULL;
+    }
     return self;
 }
 
-void stream_app_spawn_thread(StreamApp *app, MyConnection *connection) {
+void stream_app_spawn_thread(MyStreamApp *app, MyConnection *connection) {
     ALOGI("%s: Starting stream client mainloop thread", __FUNCTION__);
-    my_stream_client_set_connection(app, connection);
+    stream_client_set_connection(app, connection);
     int ret = os_thread_helper_start(&app->play_thread, &stream_app_thread_func, app);
     (void)ret;
     g_assert(ret == 0);
 }
 
-void stream_app_stop(StreamApp *app) {
+void stream_app_stop(MyStreamApp *app) {
     ALOGI("%s: Stopping pipeline and ending thread", __FUNCTION__);
 
     if (app->pipeline != NULL) {
@@ -342,29 +358,7 @@ void stream_app_stop(StreamApp *app) {
     g_clear_object(&app->loop);
 }
 
-void stream_app_destroy(StreamApp **ptr_app) {
-    if (ptr_app == NULL) {
-        return;
-    }
-    StreamApp *app = *ptr_app;
-    if (app == NULL) {
-        return;
-    }
-
-    gst_clear_object(&app->sample);
-    gst_clear_object(&app->pipeline);
-    gst_clear_object(&app->gst_gl_display);
-    gst_clear_object(&app->gst_gl_context);
-    gst_clear_object(&app->gst_gl_other_context);
-    gst_clear_object(&app->display);
-    gst_clear_object(&app->context);
-    gst_clear_object(&app->appsink);
-
-    free(app);
-    *ptr_app = NULL;
-}
-
-struct MySample *stream_app_try_pull_sample(StreamApp *app, struct timespec *out_decode_end) {
+struct MySample *stream_app_try_pull_sample(MyStreamApp *app, struct timespec *out_decode_end) {
     if (!app->appsink) {
         // Not setup yet.
         return NULL;
@@ -444,22 +438,24 @@ struct MySample *stream_app_try_pull_sample(StreamApp *app, struct timespec *out
     return (struct MySample *)ret;
 }
 
-void stream_app_release_sample(StreamApp *app, struct MySample *sample) {
+void stream_app_release_sample(MyStreamApp *app, struct MySample *sample) {
     struct MySampleImpl *impl = (struct MySampleImpl *)sample;
     //    ALOGI("Releasing sample with texture ID %d", impl->base.frame_texture_id);
     gst_sample_unref(impl->sample);
     free(impl);
 }
 
-uint32_t stream_app_get_video_width(StreamApp *app) {
+uint32_t stream_app_get_video_width(MyStreamApp *app) {
     return app->width;
 }
 
-uint32_t stream_app_get_video_height(StreamApp *app) {
+uint32_t stream_app_get_video_height(MyStreamApp *app) {
     return app->height;
 }
 
-static void on_need_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
+/* ------------------------------ */
+
+static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     ALOGI("%s", __FUNCTION__);
 
     g_assert_nonnull(app);
@@ -605,7 +601,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
     app->timeout_src_id_print_stats = g_timeout_add_seconds(3, G_SOURCE_FUNC(print_stats), app);
 }
 
-static void on_drop_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
+static void on_drop_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     ALOGI("%s", __FUNCTION__);
 
     if (app->pipeline) {
@@ -619,7 +615,7 @@ static void on_drop_pipeline_cb(MyConnection *my_conn, StreamApp *app) {
  * Helper functions
  */
 
-static void my_stream_client_set_connection(StreamApp *app, MyConnection *connection) {
+static void stream_client_set_connection(MyStreamApp *app, MyConnection *connection) {
     g_clear_object(&app->connection);
     if (connection != NULL) {
         app->connection = g_object_ref(connection);

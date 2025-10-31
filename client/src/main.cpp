@@ -50,7 +50,7 @@ struct MyState {
     std::optional<int64_t> press_time;
 
     MyConnection *connection;
-    StreamApp *stream_app;
+    MyStreamApp *stream_app;
 
     std::string host_ip;
 
@@ -472,7 +472,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             // Set up gst logger
             gst_debug_set_default_threshold(GST_LEVEL_WARNING);
 
-            state_.stream_app = stream_app_new();
+            state_.stream_app = my_stream_app_new();
             stream_app_set_egl_context(state_.stream_app,
                                        state_.initialEglData->context,
                                        state_.initialEglData->display,
@@ -502,7 +502,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
             stream_app_stop(state_.stream_app);
 
-            stream_app_destroy(&state_.stream_app);
+            g_clear_object(&state_.stream_app);
 
             my_connection_disconnect(state_.connection);
 
