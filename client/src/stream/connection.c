@@ -292,22 +292,23 @@ static void my_connection_class_init(MyConnectionClass *klass) {
     ALOGI("%s: End", __FUNCTION__);
 }
 
-static void conn_disconnect_internal(MyConnection *conn, enum my_status status) {
+void my_connection_disconnect(MyConnection *conn) {
     if (conn->ws_cancel != NULL) {
         g_cancellable_cancel(conn->ws_cancel);
         gst_clear_object(&conn->ws_cancel);
     }
 
     // Notify stream app to drop the pipeline.
-    ALOGI("Dropping pipeline upon WebSocket disconnection");
+    ALOGI("Emit ON_DROP_PIPELINE upon WebSocket disconnection");
     g_signal_emit(conn, signals[SIGNAL_ON_DROP_PIPELINE], 0);
 
     if (conn->ws) {
+        ALOGI("Closing WebSocket connection.");
         soup_websocket_connection_close(conn->ws, 0, "");
     }
     g_clear_object(&conn->ws);
 
-    ALOGI("WebSocket closed.");
+    conn_update_status(conn, MY_STATUS_IDLE_NOT_CONNECTED);
 
     // ENet
     if (conn->peer) {
@@ -347,8 +348,6 @@ static void conn_disconnect_internal(MyConnection *conn, enum my_status status) 
         enet_deinitialize();
     }
 }
-
-static void conn_connect_internal(MyConnection *conn, enum my_status status);
 
 static void conn_on_ws_message_cb(SoupWebsocketConnection *connection, gint type, GBytes *message, MyConnection *conn) {
     // ALOGD("%s", __FUNCTION__);
@@ -502,7 +501,7 @@ static void *enet_thread_func(void *ptr) {
     return NULL;
 }
 
-static void conn_connect_internal(MyConnection *conn, enum my_status status) {
+void my_connection_connect(MyConnection *conn) {
     // Reset previous connection.
     my_connection_disconnect(conn);
     if (!conn->ws_cancel) {
@@ -587,16 +586,6 @@ MyConnection *my_connection_new_localhost() {
     g_assert(os_thread_helper_init(&conn->enet_thread) >= 0);
 
     return conn;
-}
-
-void my_connection_connect(MyConnection *conn) {
-    conn_connect_internal(conn, MY_STATUS_CONNECTING);
-}
-
-void my_connection_disconnect(MyConnection *conn) {
-    if (conn) {
-        conn_disconnect_internal(conn, MY_STATUS_IDLE_NOT_CONNECTED);
-    }
 }
 
 bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
