@@ -87,15 +87,18 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
 
     let host = addr.ip().to_string();
 
-    let encoder = "x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! ";
-    // let encoder = "amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! ";
+    let sw_encoder = "videoconvert ! \
+        videoscale ! \
+        video/x-raw,width=1920,height=1080,format=NV12,framerate=60/1 ! \
+        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! ";
+
+    let hw_encoder = "d3d11convert ! \
+        video/x-raw(memory:D3D11Memory),format=NV12,width=1920,height=1080,framerate=60/1 ! \
+        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! ";
 
     let pipeline_str = format!(
         "rtpbin name=rtpbin \
         d3d11screencapturesrc show-cursor=true ! \
-        videoconvert ! \
-        videoscale ! \
-        video/x-raw,width=1920,height=1080,format=NV12,framerate=60/1 ! \
         {}\
         video/x-h264,profile=baseline ! \
         rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
@@ -112,7 +115,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
         rtpbin.send_rtp_sink_1 \
         rtpbin. ! \
         udpsink host={} port=5602 sync=false",
-        encoder, host, host
+        hw_encoder, host, host
     );
 
     println!("Attempting to start pipeline to: {}...", addr);
