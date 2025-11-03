@@ -11,6 +11,7 @@ use futures::{
     future, pin_mut,
 };
 use gstreamer::get_timestamp;
+use std::io::pipe;
 use std::{
     collections::HashMap,
     io::Error as IoError,
@@ -54,6 +55,26 @@ fn init_gstreamer() {
     });
 }
 
+fn udpsrc_sink_pad_probe(_pad: &gst::Pad, info: &mut gst::PadProbeInfo) -> gst::PadProbeReturn {
+    if let Some(gst::PadProbeData::Buffer(ref buffer)) = info.data {
+        // Acquire the lock for the global pipeline state.
+        let mut guard = PIPELINE_GUARD.lock().unwrap();
+
+        // Use `Option::take()` to extract the pipeline and replace the value with None.
+        // The extracted pipeline reference will then be dropped when it goes out of scope.
+        if let Some(pipeline) = guard.as_ref() {
+            // Check pipeline
+            let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
+            let dot_str = dot_data.as_str();
+            let a = 2;
+            let b = 2;
+            let c = a + b;
+        }
+    }
+
+    gst::PadProbeReturn::Ok
+}
+
 fn start_gstreamer_pipeline(addr: SocketAddr) {
     // Acquire the lock for the global pipeline state
     let mut guard = PIPELINE_GUARD.lock().unwrap();
@@ -66,27 +87,32 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
 
     let host = addr.ip().to_string();
 
+    let encoder = "x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! ";
+    // let encoder = "amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! ";
+
     let pipeline_str = format!(
         "rtpbin name=rtpbin \
-        d3d11screencapturesrc show-cursor=true ! videoconvert ! queue ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! \
-        video/x-h264,profile=main ! rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
+        d3d11screencapturesrc show-cursor=true ! \
+        videoconvert ! \
+        videoscale ! \
+        video/x-raw,width=1920,height=1080,format=NV12,framerate=60/1 ! \
+        {}\
+        video/x-h264,profile=baseline ! \
+        rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
         rtpbin.send_rtp_sink_0 \
         rtpbin. ! \
-        udpsink host={} port=5601 sync=false \
+        udpsink name=videoudpsrc host={} port=5601 sync=false \
         wasapi2src loopback=true low-latency=true ! \
-        queue ! \
         audioconvert ! \
         audioresample ! \
-        queue ! \
-        opusenc perfect-timestamp=false ! \
+        opusenc perfect-timestamp=false audio-type=restricted-lowdelay bitrate-type=cbr ! \
         rtpopuspay ! \
         application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
         rtpbin.send_rtp_sink_1 \
         rtpbin. ! \
         udpsink host={} port=5602 sync=false",
-        host, host
+        encoder, host, host
     );
 
     println!("Attempting to start pipeline to: {}...", addr);
@@ -110,6 +136,25 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
     };
 
     let pipeline = pipeline.downcast::<gst::Pipeline>().unwrap();
+
+    // // Add a probe
+    // {
+    //     let udpsrc = pipeline
+    //         .by_name("videoudpsrc")
+    //         .expect("Could not find videoudpsrc element.");
+    //
+    //     let pad = udpsrc
+    //         .static_pad("sink")
+    //         .expect("Could not find static sink pad in videoudpsrc.");
+    //
+    //     pad.add_probe(gst::PadProbeType::BUFFER, move |pad, info| {
+    //         udpsrc_sink_pad_probe(pad, info)
+    //     });
+    // }
+
+    // Check pipeline
+    let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
+    let dot_str = dot_data.as_str();
 
     // Store the running pipeline in the global Mutex
     *guard = Some(pipeline.clone());

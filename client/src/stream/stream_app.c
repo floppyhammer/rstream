@@ -504,25 +504,22 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     GError *error = NULL;
 
     gchar *pipeline_string = g_strdup_printf(
-        "rtpbin name=rtpbin latency=50 "
+        "rtpbin name=rtpbin latency=10 "
         // Video
         "udpsrc name=videoudpsrc port=5601 buffer-size=4000000 "
         "caps=\"application/x-rtp,media=video,payload=96,clock-rate=90000,encoding-name=H264\" ! "
         "rtpbin.recv_rtp_sink_0 "
         "rtpbin. ! "
         "rtph264depay name=depay ! "
-        "queue ! "
         "decodebin3 ! "
         "glsinkbin name=glsink "
         // Audio
-        "udpsrc name=audioudpsrc port=5602 buffer-size=8000000 "
+        "udpsrc name=audioudpsrc port=5602 buffer-size=4000000 "
         "caps=\"application/x-rtp,media=audio,payload=127,clock-rate=48000,encoding-name=OPUS\" ! "
         "rtpbin.recv_rtp_sink_1 "
         "rtpbin. ! "
         "rtpopusdepay name=audiodepay ! "
-        "queue ! "
         "opusdec ! "
-        "queue ! "
         "openslessink name=audiosink sync=true provide-clock=false buffer-time=20000 latency-time=20000 ");
 
     app->pipeline = gst_object_ref_sink(gst_parse_launch(pipeline_string, &error));
