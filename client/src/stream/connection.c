@@ -17,6 +17,7 @@
 // clang-format on
 
 #include "input.h"
+#include "stream_config.h"
 #include "thread.h"
 
 #define SERVER_ADDRESS "192.168.31.178"
@@ -408,11 +409,17 @@ static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyC
     if (error) {
         ALOGE("Websocket connection failed, error: '%s'", error->message);
         g_signal_emit(conn, signals[SIGNAL_WEBSOCKET_FAILED], 0);
-        //        conn_update_status(conn, MY_STATUS_WEBSOCKET_FAILED);
+        conn_update_status(conn, MY_STATUS_WEBSOCKET_FAILED);
         return;
     }
     g_assert_no_error(error);
-    GstBus *bus;
+
+    struct StreamConfig config = {};
+    config.video_width = 1920;
+    config.video_height = 1080;
+    config.bitrate = 20; // Mbps
+    config.pin = 1234;
+    my_connection_send_stream_config(conn, &config);
 
     ALOGI("WebSocket connected");
     g_signal_connect(conn->ws, "message", G_CALLBACK(conn_on_ws_message_cb), conn);
@@ -604,28 +611,31 @@ bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
     return TRUE;
 }
 
-void my_connection_send_input_event_via_json(MyConnection *conn, int type, float x, float y) {
+void my_connection_send_stream_config(MyConnection *conn, struct StreamConfig *config) {
     JsonBuilder *builder = json_builder_new();
     json_builder_begin_object(builder);
 
-    json_builder_set_member_name(builder, "msg-type");
-    json_builder_add_string_value(builder, "input");
+    json_builder_set_member_name(builder, "msg_type");
+    json_builder_add_string_value(builder, "config");
 
-    json_builder_set_member_name(builder, "input-type");
-    json_builder_add_int_value(builder, type);
+    json_builder_set_member_name(builder, "video_width");
+    json_builder_add_int_value(builder, config->video_width);
 
-    json_builder_set_member_name(builder, "x");
-    json_builder_add_double_value(builder, x);
+    json_builder_set_member_name(builder, "video_height");
+    json_builder_add_int_value(builder, config->video_height);
 
-    json_builder_set_member_name(builder, "y");
-    json_builder_add_double_value(builder, y);
+    json_builder_set_member_name(builder, "bitrate");
+    json_builder_add_int_value(builder, config->bitrate);
+
+    json_builder_set_member_name(builder, "pin");
+    json_builder_add_int_value(builder, config->pin);
 
     json_builder_end_object(builder);
 
     JsonNode *root = json_builder_get_root(builder);
 
     gchar *msg_str = json_to_string(root, TRUE);
-    ALOGI("Sent input message: %s", msg_str);
+    ALOGI("Sent stream config: %s", msg_str);
 
     soup_websocket_connection_send_text(conn->ws, msg_str);
 

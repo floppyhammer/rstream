@@ -11,6 +11,7 @@ use futures::{
     future, pin_mut,
 };
 use gstreamer::get_timestamp;
+use serde::{Deserialize, Serialize};
 use std::io::pipe;
 use std::{
     collections::HashMap,
@@ -333,12 +334,36 @@ pub async fn run_websocket(port: u32) -> Result<(), IoError> {
     Ok(())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StreamConfigMessage {
+    pub msg_type: String,
+    pub video_width: u32,
+    pub video_height: u32,
+    pub bitrate: u32,
+    pub pin: u32,
+}
+
 // Video control via WebSocket.
 fn handle_text_message(msg: Message) {
-    if !msg.is_text() {
-        return;
-    }
+    let text = match msg {
+        Message::Text(t) => t,
+        _ => return, // Handle other message types
+    };
 
-    let text = msg.to_text().expect("Failed to get text from message");
-    println!("Received command: {}", text);
+    match serde_json::from_str::<StreamConfigMessage>(&text) {
+        Ok(config_msg) => {
+            println!("✅ Config received successfully:");
+            println!("  Type: {}", config_msg.msg_type);
+            println!(
+                "  Video Size: {}x{}",
+                config_msg.video_width, config_msg.video_height
+            );
+            println!("  Bitrate: {}", config_msg.bitrate);
+            println!("  PIN: {}", config_msg.pin);
+        }
+        Err(e) => {
+            eprintln!("❌ ERROR: Failed to deserialize JSON: {}", e);
+            eprintln!("   Payload was: {}", text);
+        }
+    }
 }

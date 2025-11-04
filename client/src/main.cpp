@@ -40,6 +40,8 @@ struct MyState {
     int32_t h_margin;
     int32_t v_margin;
 
+    uint32_t bitrate;
+
     bool pressed;
     float press_pos_x;
     float press_pos_y;

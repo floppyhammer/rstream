@@ -3,6 +3,7 @@
 #include <glib-object.h>
 #include <gst/gstpipeline.h>
 #include <stdbool.h>
+#include "stream_config.h"
 
 G_BEGIN_DECLS
 
@@ -43,5 +44,7 @@ void my_connection_send_input_event(MyConnection *conn, int type, float x, float
  * Will be started when the websocket connection comes up in order to negotiate using the webrtcbin.
  */
 void my_connection_set_pipeline(MyConnection *conn, GstPipeline *pipeline);
+
+void my_connection_send_stream_config(MyConnection *conn, struct StreamConfig *config);
 
 G_END_DECLS
