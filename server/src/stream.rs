@@ -75,6 +75,10 @@ fn udpsrc_sink_pad_probe(_pad: &gst::Pad, info: &mut gst::PadProbeInfo) -> gst::
     gst::PadProbeReturn::Ok
 }
 
+fn check_factory_exists(factory_name: &str) -> bool {
+    gst::ElementFactory::find(factory_name).is_some()
+}
+
 fn start_gstreamer_pipeline(addr: SocketAddr) {
     // Acquire the lock for the global pipeline state
     let mut guard = PIPELINE_GUARD.lock().unwrap();
@@ -87,14 +91,20 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
 
     let host = addr.ip().to_string();
 
-    let sw_encoder = "videoconvert ! \
+    let found_amf = check_factory_exists("amfh264enc");
+
+    let encoder_str = if found_amf {
+        println!("amfh264enc is available.");
+
+        "d3d11convert ! \
+        video/x-raw(memory:D3D11Memory),width=1920,height=1080,format=NV12,framerate=60/1 ! \
+        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! "
+    } else {
+        "videoconvert ! \
         videoscale ! \
         video/x-raw,width=1920,height=1080,format=NV12,framerate=60/1 ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! ";
-
-    let hw_encoder = "d3d11convert ! \
-        video/x-raw(memory:D3D11Memory),format=NV12,width=1920,height=1080,framerate=60/1 ! \
-        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! ";
+        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! "
+    };
 
     let pipeline_str = format!(
         "rtpbin name=rtpbin \
@@ -115,7 +125,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
         rtpbin.send_rtp_sink_1 \
         rtpbin. ! \
         udpsink host={} port=5602 sync=false",
-        hw_encoder, host, host
+        encoder_str, host, host
     );
 
     println!("Attempting to start pipeline to: {}...", addr);
