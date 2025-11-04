@@ -43,7 +43,7 @@ class StreamingActivity : NativeActivity() {
                     or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
         )
 
-//        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
         super.onWindowFocusChanged(hasFocus)
     }

@@ -2,6 +2,7 @@ package com.gst.android.demo
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.util.Log
@@ -73,6 +74,8 @@ class MainMenuActivity : AppCompatActivity() {
             }
             */
         }
+
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     override fun onStart() {
