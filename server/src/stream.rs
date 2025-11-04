@@ -38,6 +38,10 @@ pub struct Peer {
 
 pub struct StreamingState {
     pub(crate) peers: HashMap<SocketAddr, Peer>,
+    pub(crate) dpi_scale: f32,
+    pub(crate) bitrate: u32,
+    pub(crate) native_resolution: (u32, u32),
+    pub(crate) stream_resolution: (u32, u32),
 }
 
 pub static STREAMING_STATE_GUARD: Mutex<Option<StreamingState>> = Mutex::new(None);
@@ -93,17 +97,31 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
 
     let found_amf = check_factory_exists("amfh264enc");
 
+    let stream_resolution;
+    {
+        let mut state_lock = STREAMING_STATE_GUARD.lock().unwrap();
+        let state = state_lock
+            .as_mut()
+            .expect("Streaming state was not initialized!");
+        stream_resolution = state.stream_resolution;
+    }
+
     let encoder_str = if found_amf {
         println!("amfh264enc is available.");
 
-        "d3d11convert ! \
-        video/x-raw(memory:D3D11Memory),width=1920,height=1080,format=NV12,framerate=60/1 ! \
-        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! "
+        format!(
+            "d3d11convert ! \
+        video/x-raw(memory:D3D11Memory),width={},height={},format=NV12,framerate=60/1 ! \
+        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! ",
+            stream_resolution.0, stream_resolution.1
+        )
     } else {
-        "videoconvert ! \
+        format!("videoconvert ! \
         videoscale ! \
-        video/x-raw,width=1920,height=1080,format=NV12,framerate=60/1 ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! "
+        video/x-raw,width={},height={},format=NV12,framerate=60/1 ! \
+        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! ",
+                stream_resolution.0, stream_resolution.1
+        )
     };
 
     let pipeline_str = format!(

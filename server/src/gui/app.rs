@@ -1,6 +1,6 @@
 use crate::discovery::run_announcer;
 use crate::gui::config::{Config, PeerManagementType};
-use crate::input::{init_enigo, init_vigem, run_enet_server};
+use crate::input::{init_enigo, init_vigem, run_enet_server, ENIGO_GUARD};
 use crate::stream::{run_websocket, Peer, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
 use chrono;
@@ -11,12 +11,13 @@ use eframe::glow::Context;
 use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
+use enigo::{Enigo, Settings};
 use futures::future;
 use std::ops::RangeInclusive;
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex, Once};
 use std::{str, thread};
 use tray_icon::menu::{MenuEvent, MenuEventReceiver, MenuId};
 
@@ -62,9 +63,17 @@ impl Default for App {
 
         let (sender, receiver) = mpsc::channel();
 
-        let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
-        let streaming_state = StreamingState { peers: [].into() };
-        *guard = Some(streaming_state);
+        {
+            let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+            let streaming_state = StreamingState {
+                peers: [].into(),
+                dpi_scale: 1.0,
+                bitrate: 20,
+                native_resolution: (1920, 1080),
+                stream_resolution: (1920, 1080),
+            };
+            *guard = Some(streaming_state);
+        }
 
         // Initialize Enigo here, guaranteeing it happens before any messages are processed.
         init_enigo();
@@ -96,10 +105,40 @@ impl Default for App {
     }
 }
 
+fn get_scale_factor(ctx: &egui::Context) -> f32 {
+    // The `input` method provides read-only access to the current InputState.
+    ctx.input(|i| {
+        // The pixels_per_point field is part of the InputState.
+        i.pixels_per_point
+    })
+}
+
+fn get_window_logical_resolution(ctx: &egui::Context) -> egui::Vec2 {
+    ctx.input(|i| {
+        // The screen_rect is the full size of the viewport/window in logical points.
+        i.screen_rect.size()
+    })
+}
+
 impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        {
+            let scale_factor = get_scale_factor(ctx);
+            if let Some(mut monitor_logical_size) = ctx.input(|i| i.viewport().monitor_size) {
+                let mut state_lock = STREAMING_STATE_GUARD.lock().unwrap();
+                let state = state_lock
+                    .as_mut()
+                    .expect("Streaming state was not initialized!");
+                monitor_logical_size *= scale_factor;
+
+                state.dpi_scale = scale_factor;
+                state.native_resolution =
+                    (monitor_logical_size.x as u32, monitor_logical_size.y as u32);
+            }
+        }
+
         let menu_channel = MenuEvent::receiver();
         // Use try_recv() for non-blocking check
         if let Ok(event) = menu_channel.try_recv() {

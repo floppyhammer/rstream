@@ -1,3 +1,4 @@
+use crate::stream::STREAMING_STATE_GUARD;
 use async_std::task;
 use byteorder::{LittleEndian, ReadBytesExt};
 use enigo::Coordinate::Abs;
@@ -246,8 +247,21 @@ fn handle_enet_packet(packet: &enet::Packet) {
         }
     };
 
-    let x: f32 = f32::from_bits(command.data0);
-    let y: f32 = f32::from_bits(command.data1);
+    let native_resolution;
+    let stream_resolution;
+    {
+        let mut state_lock = STREAMING_STATE_GUARD.lock().unwrap();
+        let state = state_lock
+            .as_mut()
+            .expect("Streaming state was not initialized!");
+        native_resolution = state.native_resolution;
+        stream_resolution = state.stream_resolution;
+    }
+
+    let x: f32 =
+        f32::from_bits(command.data0) / stream_resolution.0 as f32 * native_resolution.0 as f32;
+    let y: f32 =
+        f32::from_bits(command.data1) / stream_resolution.1 as f32 * native_resolution.1 as f32;
 
     // println!("Received input type: {:?}", command.input_type);
     // println!("Received input position: {:?}, {:?}", x, y);
