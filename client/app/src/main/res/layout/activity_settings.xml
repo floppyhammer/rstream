@@ -24,4 +24,15 @@
         android:focusable="true"
         android:background="?android:attr/selectableItemBackground" />
 
+    <TextView
+        android:id="@+id/framerate_option"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Framerate"
+        android:textSize="18sp"
+        android:padding="16dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground" />
+
 </LinearLayout>
