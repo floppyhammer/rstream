@@ -14,7 +14,7 @@ class UdpListener(
     private val onPacketReceived: (String, String) -> Unit // Callback function
 ) : CoroutineScope {
 
-    private val TAG = "ServerListener"
+    private val TAG = "RStreamClient"
     private var job: Job? = null
 
     // We use the same CoroutineContext, but 'job' is now managed manually
@@ -28,7 +28,7 @@ class UdpListener(
     fun startListening() {
         // Check if a job exists AND is active before returning
         if (job != null && job!!.isActive) {
-            Log.w(TAG, "Listener is already running.")
+            Log.w(TAG, "ServerListener: Listener is already running.")
             return
         }
 
@@ -38,10 +38,10 @@ class UdpListener(
         val scope = CoroutineScope(Dispatchers.IO + job!!)
 
         // Acquire the MulticastLock
-        multicastLock = wifiManager.createMulticastLock("UdpListenerLock").apply {
+        multicastLock = wifiManager.createMulticastLock("ServerListener: UdpListenerLock").apply {
             setReferenceCounted(true)
             acquire()
-            Log.d(TAG, "MulticastLock acquired.")
+            Log.d(TAG, "ServerListener: MulticastLock acquired.")
         }
 
         scope.launch {
@@ -53,14 +53,14 @@ class UdpListener(
                     // Set to true to receive broadcast packets (optional, but good practice)
                     broadcast = true
                 }
-                Log.d(TAG, "UDP Socket created and listening on port $port")
+                Log.d(TAG, "ServerListener: UDP Socket created and listening on port $port")
 
                 val buffer = ByteArray(bufferSize)
                 val packet = DatagramPacket(buffer, bufferSize)
 
                 while (isActive) {
                     try {
-                        Log.i(TAG, "Wait for a packet")
+                        Log.i(TAG, "ServerListener: Wait for a packet")
 
                         // 2. Wait for a packet
                         socket?.receive(packet)
@@ -69,7 +69,7 @@ class UdpListener(
                         val message = String(packet.data, 0, packet.length)
                         val senderIp = packet.address.hostAddress ?: "Unknown"
 
-                        Log.i(TAG, "UDP received packet: $message")
+                        Log.i(TAG, "ServerListener: UDP received packet: $message")
 
                         // 4. Use withContext(Dispatchers.Main) for UI updates if needed,
                         // or just invoke the callback on the current Coroutine's context (IO)
@@ -80,17 +80,17 @@ class UdpListener(
                         packet.length = bufferSize
                     } catch (e: Exception) {
                         if (isActive) {
-                            Log.e(TAG, "UDP Receive Error: ${e.message}")
+                            Log.e(TAG, "ServerListener: UDP Receive Error: ${e.message}")
                         }
                         // If the job is active, rethrow or handle specific non-cancellation exceptions
                     }
                 }
             } catch (e: SocketException) {
                 if (isActive) {
-                    Log.e(TAG, "UDP Socket Error (Start): ${e.message}")
+                    Log.e(TAG, "ServerListener: UDP Socket Error (Start): ${e.message}")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "General Listener Error: ${e.message}")
+                Log.e(TAG, "ServerListener: General Listener Error: ${e.message}")
             } finally {
                 stopListening() // Ensure cleanup on final termination
             }
@@ -98,7 +98,7 @@ class UdpListener(
     }
 
     fun stopListening() {
-        Log.d(TAG, "Stopping UDP Listener...")
+        Log.d(TAG, "ServerListener: Stopping UDP Listener...")
         // Cancel the coroutine job
         job?.cancel()
         job = null // Set job to null so startListening can restart it
@@ -111,7 +111,7 @@ class UdpListener(
         multicastLock?.let {
             if (it.isHeld) {
                 it.release()
-                Log.d(TAG, "MulticastLock released.")
+                Log.d(TAG, "ServerListener: MulticastLock released.")
             }
         }
         multicastLock = null
