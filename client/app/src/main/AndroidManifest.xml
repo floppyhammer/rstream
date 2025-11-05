@@ -31,6 +31,12 @@
         </activity>
 
         <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.DayNight.DarkActionBar">
+        </activity>
+
+        <activity
             android:name=".StreamingActivity"
             android:configChanges="screenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation|uiMode"
             android:excludeFromRecents="false"

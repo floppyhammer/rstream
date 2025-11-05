@@ -39,6 +39,12 @@ class MainMenuActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        binding.settingsButton.setOnClickListener {
+            // Create an Intent to switch to the SettingsActivity
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+
         super.onCreate(savedInstanceState)
 
         // Do this after super.onCreate
