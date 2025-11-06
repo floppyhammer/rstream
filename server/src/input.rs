@@ -281,10 +281,18 @@ fn handle_enet_packet(packet: &enet::Packet) {
         InputType::CursorLeftDown => {
             enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
             enigo.button(Button::Left, Press).unwrap();
+            println!(
+                "CursorLeftDown pressed: {} pos {},{}",
+                pressed, x as i32, y as i32
+            );
         }
         InputType::CursorLeftUp => {
             enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
             enigo.button(Button::Left, Release).unwrap();
+            println!(
+                "CursorLeftUp pressed: {} pos {},{}",
+                pressed, x as i32, y as i32
+            );
         }
         InputType::CursorMove => {
             enigo.move_mouse(x as i32, y as i32, Abs).unwrap();

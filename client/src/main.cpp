@@ -51,6 +51,10 @@ struct MyState {
 
     std::optional<int64_t> press_time;
 
+    int64_t last_time_cursor_down;
+    float last_cursor_down_pos_x;
+    float last_cursor_down_pos_y;
+
     MyConnection *connection;
     MyStreamApp *stream_app;
 
@@ -333,10 +337,29 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 state_.press_pos_y = client_y;
                 state_.prev_pos_x = client_x;
                 state_.prev_pos_y = client_y;
+
+                int64_t now = g_get_monotonic_time();
+
+                auto new_client_x = client_x;
+                auto new_client_y = client_y;
+
+                // Double click
+                auto down_interval = float(now - state_.last_time_cursor_down) / 1.0e3f;
+                if (down_interval < 500) {
+                    new_client_x = state_.last_cursor_down_pos_x;
+                    new_client_y = state_.last_cursor_down_pos_y;
+
+                    ALOGI("INPUT: double click (%.1f, %.1f), interval %.1f", new_client_x, new_client_y, down_interval);
+                }
+
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::CursorLeftDown),
-                                               client_x,
-                                               client_y);
+                                               new_client_x,
+                                               new_client_y);
+
+                state_.last_time_cursor_down = now;
+                state_.last_cursor_down_pos_x = client_x;
+                state_.last_cursor_down_pos_y = client_y;
             }
                 // A second touch is down.
             case AMOTION_EVENT_ACTION_POINTER_DOWN: {
@@ -420,10 +443,12 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
 
                 if (std::abs(state_.press_pos_x - client_x) < 10 && std::abs(state_.press_pos_y - client_y) < 10) {
                     ALOGI("INPUT: CLICK (%.1f, %.1f)", client_x, client_y);
+
                     my_connection_send_input_event(state_.connection,
                                                    static_cast<int>(InputType::CursorLeftClick),
                                                    client_x,
                                                    client_y);
+
                     break;
                 }
 
