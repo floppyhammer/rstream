@@ -3,6 +3,7 @@
 #include <glib-object.h>
 #include <gst/gstpipeline.h>
 #include <stdbool.h>
+
 #include "stream_config.h"
 
 G_BEGIN_DECLS
@@ -46,5 +47,7 @@ void my_connection_send_input_event(MyConnection *conn, int type, float x, float
 void my_connection_set_pipeline(MyConnection *conn, GstPipeline *pipeline);
 
 void my_connection_send_stream_config(MyConnection *conn, struct StreamConfig *config);
+
+bool my_connection_server_closed(MyConnection *conn);
 
 G_END_DECLS

@@ -45,6 +45,8 @@ struct _MyConnection {
     ENetPeer *peer;
     struct os_thread_helper enet_thread;
     GAsyncQueue *packet_queue;
+
+    bool server_closed;
 };
 
 G_DEFINE_TYPE(MyConnection, my_connection, G_TYPE_OBJECT)
@@ -399,6 +401,12 @@ out:
     g_object_unref(parser);
 }
 
+static void conn_websocket_closed_cb(SoupWebsocketConnection *connection, MyConnection *conn) {
+    ALOGI("%s", __FUNCTION__);
+
+    conn->server_closed = true;
+}
+
 static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyConnection *conn) {
     GError *error = NULL;
 
@@ -422,8 +430,11 @@ static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyC
     my_connection_send_stream_config(conn, &config);
 
     ALOGI("WebSocket connected");
+
     g_signal_connect(conn->ws, "message", G_CALLBACK(conn_on_ws_message_cb), conn);
     g_signal_emit(conn, signals[SIGNAL_WEBSOCKET_CONNECTED], 0);
+
+    g_signal_connect(conn->ws, "closed", G_CALLBACK(conn_websocket_closed_cb), conn);
 
     ALOGI("Creating pipeline upon WebSocket connection");
     g_assert_null(conn->pipeline);
@@ -643,6 +654,10 @@ void my_connection_send_stream_config(MyConnection *conn, struct StreamConfig *c
 
     json_node_unref(root);
     g_object_unref(builder);
+}
+
+bool my_connection_server_closed(MyConnection *conn) {
+    return conn->server_closed;
 }
 
 const int COMMAND_SIZE = sizeof(InputCommand);

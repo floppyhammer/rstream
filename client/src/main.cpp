@@ -713,6 +713,12 @@ void android_main(struct android_app *app) {
             continue;
         }
 
+        // Exit the native activity upon connection loss.
+        if (my_connection_server_closed(state_.connection)) {
+            ALOGI("Server closed, exiting.");
+            ANativeActivity_finish(app->activity);
+        }
+
         state_.initialEglData->makeCurrent();
 
         struct timespec decodeEndTime;
