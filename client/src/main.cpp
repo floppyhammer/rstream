@@ -65,6 +65,13 @@ struct MyState {
     std::unique_ptr<EglData> initialEglData;
 
     pthread_t listener_tid;
+
+    float prev_lt = 0;
+    float prev_rt = 0;
+    float prev_lx = 0;
+    float prev_ly = 0;
+    float prev_rx = 0;
+    float prev_ry = 0;
 };
 
 MyState state_ = {};
@@ -89,41 +96,42 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             float ry = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
 
             // --- Optional: Handling D-pad as Analog HAT Axis ---
-            float hat_x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_X, 0);
-            float hat_y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_Y, 0);
+//            float hat_x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_X, 0);
+//            float hat_y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_Y, 0);
+//            ALOGI("Gamepad D-Pad HAT (%.1f, %.1f)", hat_x, hat_y);
 
-            // 2. Get the value of the Left Trigger (LT)
             float lt_value = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_LTRIGGER, 0);
-
-            // 3. Get the value of the Right Trigger (RT)
             float rt_value = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RTRIGGER, 0);
 
-            // 4. Process the values
-            if (lt_value > 0.0f) {
+            if (abs(state_.prev_lt - lt_value) > 0.001) {
                 ALOGI("Gamepad Left Trigger pressed: %.3f", lt_value);
-                my_connection_send_input_event(state_.connection, InputType::GamepadButtonL2, lt_value, 0);
-                return 0;
+                state_.prev_lt = lt_value;
+                my_connection_send_input_event(state_.connection, InputType::GamepadButtonLT, lt_value, 0);
+                return 1;
             }
 
-            if (rt_value > 0.0f) {
+            if (abs(state_.prev_rt - rt_value) > 0.001) {
                 ALOGI("Gamepad Right Trigger pressed: %.3f", rt_value);
-                my_connection_send_input_event(state_.connection, InputType::GamepadButtonR2, rt_value, 0);
-                return 0;
+                state_.prev_rt = rt_value;
+                my_connection_send_input_event(state_.connection, InputType::GamepadButtonRT, rt_value, 0);
+                return 1;
             }
 
-            if (hat_x != 0.0f || hat_y != 0.0f) {
-                // If hat_x is 1.0, RIGHT is pressed. If -1.0, LEFT is pressed.
-                // If hat_y is 1.0, DOWN is pressed. If -1.0, UP is pressed.
-                ALOGI("Gamepad D-Pad HAT (%.1f, %.1f)", hat_x, hat_y);
-                return 0;
-            } else {
-                ALOGI("Gamepad JOYSTICK L(%.1f, %.1f) R(%.1f, %.1f)", lx, ly, rx, ry);
-
+            if (abs(state_.prev_lx - lx) > 0.001 || abs(state_.prev_ly - ly) > 0.001) {
+                ALOGI("Gamepad JOYSTICK L(%.1f, %.1f) ", lx, ly);
+                state_.prev_lx = lx;
+                state_.prev_ly = ly;
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadLeftStick),
                                                lx,
                                                ly);
+                return 1;
+            }
 
+            if (abs(state_.prev_rx - rx) > 0.001 || abs(state_.prev_ry - ry) > 0.001) {
+                ALOGI("Gamepad JOYSTICK R(%.1f, %.1f)", rx, ry);
+                state_.prev_rx = rx;
+                state_.prev_ry = ry;
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadRightStick),
                                                rx,
@@ -174,7 +182,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             } break;
             case AKEYCODE_BUTTON_L1: {
                 my_connection_send_input_event(state_.connection,
-                                               static_cast<int>(InputType::GamepadButtonL1),
+                                               static_cast<int>(InputType::GamepadButtonLB),
                                                pressed ? 1 : 0,
                                                0);
 
@@ -182,7 +190,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             } break;
             case AKEYCODE_BUTTON_R1: {
                 my_connection_send_input_event(state_.connection,
-                                               static_cast<int>(InputType::GamepadButtonR1),
+                                               static_cast<int>(InputType::GamepadButtonRB),
                                                pressed ? 1 : 0,
                                                0);
 

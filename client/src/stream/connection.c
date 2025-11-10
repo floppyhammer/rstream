@@ -650,9 +650,10 @@ const int COMMAND_SIZE = sizeof(InputCommand);
 void my_connection_send_input_command_via_enet(MyConnection *conn, InputCommand *input_data) {
     ENetPacketFlag flag = ENET_PACKET_FLAG_RELIABLE;
 
-    // For input commands that are not important.
-    if (input_data->type == CursorMove || input_data->type == GamepadLeftStick ||
-        input_data->type == GamepadRightStick) {
+    // For input commands that are continuous.
+    if (input_data->type == CursorMove || input_data->type == CursorScroll || input_data->type == GamepadLeftStick ||
+        input_data->type == GamepadRightStick || input_data->type == GamepadButtonLT ||
+        input_data->type == GamepadButtonRT) {
         flag = ENET_PACKET_FLAG_UNSEQUENCED;
     }
 

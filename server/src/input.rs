@@ -258,10 +258,11 @@ fn handle_enet_packet(packet: &enet::Packet) {
         stream_resolution = state.stream_resolution;
     }
 
-    let x: f32 =
-        f32::from_bits(command.data0) / stream_resolution.0 as f32 * native_resolution.0 as f32;
-    let y: f32 =
-        f32::from_bits(command.data1) / stream_resolution.1 as f32 * native_resolution.1 as f32;
+    let x: f32 = f32::from_bits(command.data0);
+    let y: f32 = f32::from_bits(command.data1);
+
+    let x_coord = x / stream_resolution.0 as f32 * native_resolution.0 as f32;
+    let y_coord = y / stream_resolution.1 as f32 * native_resolution.1 as f32;
 
     // println!("Received input type: {:?}", command.input_type);
     // println!("Received input position: {:?}, {:?}", x, y);
@@ -279,23 +280,29 @@ fn handle_enet_packet(packet: &enet::Packet) {
 
     match input_type {
         InputType::CursorLeftDown => {
-            enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
+            enigo
+                .move_mouse(x_coord as i32, y_coord as i32, Abs)
+                .unwrap();
             enigo.button(Button::Left, Press).unwrap();
             println!(
                 "CursorLeftDown pressed: {} pos {},{}",
-                pressed, x as i32, y as i32
+                pressed, x_coord as i32, y_coord as i32
             );
         }
         InputType::CursorLeftUp => {
-            enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
+            enigo
+                .move_mouse(x_coord as i32, y_coord as i32, Abs)
+                .unwrap();
             enigo.button(Button::Left, Release).unwrap();
             println!(
                 "CursorLeftUp pressed: {} pos {},{}",
-                pressed, x as i32, y as i32
+                pressed, x_coord as i32, y_coord as i32
             );
         }
         InputType::CursorMove => {
-            enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
+            enigo
+                .move_mouse(x_coord as i32, y_coord as i32, Abs)
+                .unwrap();
         }
         InputType::CursorScroll => {
             if x.abs() > 0.1 {
@@ -310,97 +317,87 @@ fn handle_enet_packet(packet: &enet::Packet) {
             }
         }
         InputType::CursorLeftClick => {
-            enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
+            enigo
+                .move_mouse(x_coord as i32, y_coord as i32, Abs)
+                .unwrap();
             // NOTE: You may want to add enigo.button(Button::Left, Click).unwrap(); here
         }
         InputType::CursorRightClick => {
-            enigo.move_mouse(x as i32, y as i32, Abs).unwrap();
+            enigo
+                .move_mouse(x_coord as i32, y_coord as i32, Abs)
+                .unwrap();
             enigo.button(Button::Right, Click).unwrap();
         }
         InputType::GamepadButtonX => {
-            println!("Gamepad button X");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::X);
+
+            println!("Gamepad button X {}", pressed);
         }
         InputType::GamepadButtonY => {
-            println!("Gamepad button Y");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::Y);
+            println!("Gamepad button Y {}", pressed);
         }
         InputType::GamepadButtonA => {
-            println!("Gamepad button A");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::A);
+            println!("Gamepad button A {}", pressed);
         }
         InputType::GamepadButtonB => {
-            println!("Gamepad button B");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::B);
+            println!("Gamepad button B {}", pressed);
         }
         InputType::GamepadButtonL1 => {
-            println!("Gamepad button L1");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::LB);
+            println!("Gamepad button LB {}", pressed);
         }
         InputType::GamepadButtonR1 => {
-            println!("Gamepad button R1");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::RB);
+            println!("Gamepad button RB {}", pressed);
         }
         InputType::GamepadButtonL2 => {
-            println!("Gamepad button L1");
+            println!("Gamepad button LT {}", x);
 
             gamepad.left_trigger = (x * 256.0) as u8;
         }
         InputType::GamepadButtonR2 => {
-            println!("Gamepad button R2");
+            println!("Gamepad button RT {}", x);
 
             gamepad.right_trigger = (x * 256.0) as u8;
         }
         InputType::GamepadButtonStart => {
-            println!("Gamepad button START");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::START);
+            println!("Gamepad button START {}", pressed);
         }
         InputType::GamepadButtonSelect => {
-            println!("Gamepad button SELECT");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::BACK);
+            println!("Gamepad button SELECT {}", pressed);
         }
         InputType::GamepadButtonUp => {
-            println!("Gamepad button UP");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::UP);
+            println!("Gamepad button UP {}", pressed);
         }
         InputType::GamepadButtonDown => {
-            // Gamepad logic needs to be implemented here
-            println!("Gamepad button DOWN");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::DOWN);
+            println!("Gamepad button DOWN {}", pressed);
         }
         InputType::GamepadButtonLeft => {
-            // Gamepad logic needs to be implemented here
-            println!("Gamepad button LEFT");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::LEFT);
+            println!("Gamepad button LEFT {}", pressed);
         }
         InputType::GamepadButtonRight => {
-            // Gamepad logic needs to be implemented here
-            println!("Gamepad button RIGHT");
-
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::RIGHT);
+            println!("Gamepad button RIGHT {}", pressed);
         }
         InputType::GamepadLeftStick => {
             println!("Gamepad Left Stick ({}, {})", x, y);
