@@ -383,6 +383,11 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 size_t pointer_count = AMotionEvent_getPointerCount(event);
 
                 if (pointer_count > 1) {
+                    if (pointer_count > 2) {
+                        my_connection_send_input_event(state_.connection, InputType::KeyboardSuper, 1, 0);
+                        break;
+                    }
+
                     // Release left cursor down in situ, so it won't trigger a selection action.
                     if (state_.pressed) {
                         my_connection_send_input_event(state_.connection,
@@ -407,7 +412,6 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                     state_.prev_pos_center_y = y_center;
 
                     ALOGI("INPUT: Multiple touch down %zu", pointer_count);
-                    break;
                 }
             } break;
             case AMOTION_EVENT_ACTION_MOVE:

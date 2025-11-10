@@ -3,7 +3,7 @@ use async_std::task;
 use byteorder::{LittleEndian, ReadBytesExt};
 use enigo::Coordinate::Abs;
 use enigo::Direction::{Click, Press, Release};
-use enigo::{Button, Enigo, Mouse, Settings};
+use enigo::{Button, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 use rusty_enet as enet;
 use std::io::Cursor;
 use std::io::Error as IoError;
@@ -177,6 +177,7 @@ enum InputType {
     GamepadRightStick = 19,
     GamepadButtonStart = 20,
     GamepadButtonSelect = 21,
+    KeyboardSuper = 22,
 }
 
 impl TryFrom<u8> for InputType {
@@ -206,6 +207,7 @@ impl TryFrom<u8> for InputType {
             19 => Ok(InputType::GamepadRightStick),
             20 => Ok(InputType::GamepadButtonStart),
             21 => Ok(InputType::GamepadButtonSelect),
+            22 => Ok(InputType::KeyboardSuper),
             _ => Err("Invalid integer for MyEnum"),
         }
     }
@@ -300,11 +302,15 @@ fn handle_enet_packet(packet: &enet::Packet) {
         }
         InputType::CursorScroll => {
             if x.abs() > 0.1 {
-                enigo.scroll((-x * 0.2) as i32, enigo::Axis::Horizontal).unwrap();
+                enigo
+                    .scroll((-x * 0.2) as i32, enigo::Axis::Horizontal)
+                    .unwrap();
                 println!("Cursor scroll delta X {}", x);
             }
             if y.abs() > 0.1 {
-                enigo.scroll((-y * 0.2) as i32, enigo::Axis::Vertical).unwrap();
+                enigo
+                    .scroll((-y * 0.2) as i32, enigo::Axis::Vertical)
+                    .unwrap();
                 println!("Cursor scroll delta Y {}", y);
             }
         }
@@ -403,6 +409,12 @@ fn handle_enet_packet(packet: &enet::Packet) {
 
             gamepad.thumb_rx = (x * 32767.0) as i16;
             gamepad.thumb_ry = (y * -32767.0) as i16;
+        }
+        InputType::KeyboardSuper => {
+            pressed = x > 0.0;
+            println!("Keyboard SUPER {}", pressed);
+
+            enigo.key(Key::Meta, Direction::Click).unwrap();
         }
     }
 

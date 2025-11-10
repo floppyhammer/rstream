@@ -23,6 +23,7 @@ typedef enum : uint8_t {
     GamepadRightStick,
     GamepadButtonStart,
     GamepadButtonSelect,
+    KeyboardSuper,
 } InputType;
 
 #pragma pack(push, 1)
