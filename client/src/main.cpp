@@ -614,6 +614,10 @@ bool poll_events(struct android_app *app) {
             if (timeout == 0 && (!app->window || app->activityState != APP_CMD_RESUME)) {
                 break;
             }
+
+            if (app->destroyRequested) {
+                return false;
+            }
         } else {
             break;
         }
@@ -697,11 +701,12 @@ void android_main(struct android_app *app) {
         env->DeleteLocalRef(intentObject);
     }
 
-    // Main rendering loop.
     ALOGI("Starting main loop");
+
+    // Main rendering loop.
     while (!app->destroyRequested) {
         if (!poll_events(app)) {
-            continue;
+            break;
         }
 
         if (!state_.initialEglData || !state_.renderer || !state_.stream_app) {

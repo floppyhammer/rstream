@@ -60,7 +60,7 @@ class UdpListener(
 
                 while (isActive) {
                     try {
-                        Log.i(TAG, "ServerListener: Wait for a packet")
+//                        Log.i(TAG, "ServerListener: Wait for a packet")
 
                         // 2. Wait for a packet
                         socket?.receive(packet)

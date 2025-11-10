@@ -81,8 +81,6 @@ class MainMenuActivity : AppCompatActivity() {
 
         udpListener = UdpListener(UDP_PORT, wifiManager) { message, senderIp ->
             // This runs on a background thread
-            Log.d("RStreamClient", "Packet from $senderIp: $message")
-
             val isNewHost = !discoveredHosts.containsKey(senderIp)
             discoveredHosts[senderIp] = System.currentTimeMillis()
 
