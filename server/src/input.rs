@@ -284,20 +284,14 @@ fn handle_enet_packet(packet: &enet::Packet) {
                 .move_mouse(x_coord as i32, y_coord as i32, Abs)
                 .unwrap();
             enigo.button(Button::Left, Press).unwrap();
-            println!(
-                "CursorLeftDown pressed: {} pos {},{}",
-                pressed, x_coord as i32, y_coord as i32
-            );
+            println!("CursorLeftDown pos {},{}", x_coord as i32, y_coord as i32);
         }
         InputType::CursorLeftUp => {
             enigo
                 .move_mouse(x_coord as i32, y_coord as i32, Abs)
                 .unwrap();
             enigo.button(Button::Left, Release).unwrap();
-            println!(
-                "CursorLeftUp pressed: {} pos {},{}",
-                pressed, x_coord as i32, y_coord as i32
-            );
+            println!("CursorLeftUp pos {},{}", x_coord as i32, y_coord as i32);
         }
         InputType::CursorMove => {
             enigo
@@ -306,14 +300,12 @@ fn handle_enet_packet(packet: &enet::Packet) {
         }
         InputType::CursorScroll => {
             if x.abs() > 0.1 {
-                enigo
-                    .scroll((-x / 10.0) as i32, enigo::Axis::Horizontal)
-                    .unwrap();
+                enigo.scroll((-x * 0.2) as i32, enigo::Axis::Horizontal).unwrap();
+                println!("Cursor scroll delta X {}", x);
             }
             if y.abs() > 0.1 {
-                enigo
-                    .scroll((-y / 10.0) as i32, enigo::Axis::Vertical)
-                    .unwrap();
+                enigo.scroll((-y * 0.2) as i32, enigo::Axis::Vertical).unwrap();
+                println!("Cursor scroll delta Y {}", y);
             }
         }
         InputType::CursorLeftClick => {
@@ -327,6 +319,7 @@ fn handle_enet_packet(packet: &enet::Packet) {
                 .move_mouse(x_coord as i32, y_coord as i32, Abs)
                 .unwrap();
             enigo.button(Button::Right, Click).unwrap();
+            println!("CursorRightClick pos {},{}", x_coord as i32, y_coord as i32);
         }
         InputType::GamepadButtonX => {
             pressed = x > 0.0;

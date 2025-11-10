@@ -13,6 +13,7 @@ use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
 use enigo::{Enigo, Settings};
 use futures::future;
+use local_ip_address::list_afinet_netifas;
 use std::ops::RangeInclusive;
 use std::os::windows::process::CommandExt;
 use std::process::Command;
@@ -84,7 +85,16 @@ impl Default for App {
 
         let enet_handle = task::spawn(run_enet_server());
 
-        let announcer_handle = task::spawn(run_announcer());
+        let network_interfaces = list_afinet_netifas().unwrap();
+
+        for (name, ip) in network_interfaces.iter() {
+            if ip.is_ipv4() {
+                let local_ip = ip.to_string();
+                if local_ip.starts_with("192.168.") || local_ip.starts_with("10.11.") {
+                    let announcer_handle = task::spawn(run_announcer(local_ip));
+                }
+            }
+        }
 
         Self {
             config,

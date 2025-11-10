@@ -1,6 +1,6 @@
 use async_std::task;
 use chrono::Utc;
-use local_ip_address::local_ip;
+use local_ip_address::{list_afinet_netifas, local_ip};
 use std::io;
 use std::io::Error as IoError;
 use std::net::{Ipv4Addr, UdpSocket};
@@ -12,15 +12,13 @@ const BROADCAST_PORT: u16 = 55555;
 const BROADCAST_ADDRESS: Ipv4Addr = Ipv4Addr::new(255, 255, 255, 255);
 const ANNOUNCE_INTERVAL_SECONDS: u64 = 2;
 
-pub(crate) async fn run_announcer() -> Result<(), IoError> {
-    task::spawn_blocking(|| -> io::Result<()> {
-        let my_local_ip = local_ip().expect("Error getting local IP");
-        let ip_str = my_local_ip.to_string();
-        println!("Local IP address: {:?}", ip_str);
+pub(crate) async fn run_announcer(local_ip: String) -> Result<(), IoError> {
+    task::spawn_blocking(move || -> io::Result<()> {
+        println!("Local IP address: {}", local_ip);
 
         // 1. Create a UDP socket and bind it to a local address (0.0.0.0 for all interfaces)
         // We bind to 0.0.0.0 and port 0, letting the OS choose a free port.
-        let socket = UdpSocket::bind(format!("{}:0", ip_str))?;
+        let socket = UdpSocket::bind(format!("{}:0", local_ip))?;
 
         // 2. Enable broadcast functionality
         // This is required to send packets to 255.255.255.255

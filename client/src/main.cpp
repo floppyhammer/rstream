@@ -49,6 +49,10 @@ struct MyState {
     float prev_pos_y;
     bool scrolling;
 
+    // Scroll
+    float prev_pos_center_x;
+    float prev_pos_center_y;
+
     std::optional<int64_t> press_time;
 
     int64_t last_time_cursor_down;
@@ -96,9 +100,9 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             float ry = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
 
             // --- Optional: Handling D-pad as Analog HAT Axis ---
-//            float hat_x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_X, 0);
-//            float hat_y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_Y, 0);
-//            ALOGI("Gamepad D-Pad HAT (%.1f, %.1f)", hat_x, hat_y);
+            //            float hat_x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_X, 0);
+            //            float hat_y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_HAT_Y, 0);
+            //            ALOGI("Gamepad D-Pad HAT (%.1f, %.1f)", hat_x, hat_y);
 
             float lt_value = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_LTRIGGER, 0);
             float rt_value = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RTRIGGER, 0);
@@ -379,16 +383,46 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 size_t pointer_count = AMotionEvent_getPointerCount(event);
 
                 if (pointer_count > 1) {
-                    state_.pressed = false;
-                    state_.press_time.reset();
+                    // Release left cursor down in situ, so it won't trigger a selection action.
+                    if (state_.pressed) {
+                        my_connection_send_input_event(state_.connection,
+                                                       InputType::CursorLeftUp,
+                                                       state_.press_pos_x,
+                                                       state_.press_pos_y);
+
+                        state_.pressed = false;
+                        state_.press_time.reset();
+                    }
+
+                    float x0 = AMotionEvent_getX(event, 0);
+                    float y0 = AMotionEvent_getY(event, 0);
+
+                    float x1 = AMotionEvent_getX(event, 1);
+                    float y1 = AMotionEvent_getY(event, 1);
+
+                    float x_center = (x0 + x1) * 0.5f;
+                    float y_center = (y0 + y1) * 0.5f;
+
+                    state_.prev_pos_center_x = x_center;
+                    state_.prev_pos_center_y = y_center;
+
                     ALOGI("INPUT: Multiple touch down %zu", pointer_count);
                     break;
                 }
             } break;
             case AMOTION_EVENT_ACTION_MOVE:
                 if (AMotionEvent_getPointerCount(event) > 1) {
-                    float dx = client_x - state_.prev_pos_x;
-                    float dy = client_y - state_.prev_pos_y;
+                    float x0 = AMotionEvent_getX(event, 0);
+                    float y0 = AMotionEvent_getY(event, 0);
+
+                    float x1 = AMotionEvent_getX(event, 1);
+                    float y1 = AMotionEvent_getY(event, 1);
+
+                    float x_center = (x0 + x1) / 2;
+                    float y_center = (y0 + y1) / 2;
+
+                    float dx = x_center - state_.prev_pos_center_x;
+                    float dy = y_center - state_.prev_pos_center_y;
 
                     if (dx == 0 || dy == 0) {
                         break;
@@ -398,8 +432,9 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                                                    static_cast<int>(InputType::CursorScroll),
                                                    dx,
                                                    dy);
-                    state_.prev_pos_x = client_x;
-                    state_.prev_pos_y = client_y;
+
+                    state_.prev_pos_center_x = x_center;
+                    state_.prev_pos_center_y = y_center;
 
                     state_.scrolling = true;
                 } else {
