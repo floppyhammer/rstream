@@ -12,9 +12,11 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var videoQualityOption: TextView
     private lateinit var framerateOption: TextView
+    private lateinit var bitrateOption: TextView
     private val PREFS_NAME = "SettingsPrefs"
     private val VIDEO_QUALITY_KEY = "video_quality"
     private val FRAMERATE_KEY = "framerate"
+    private val BITRATE_KEY = "bitrate"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,8 +24,10 @@ class SettingsActivity : AppCompatActivity() {
 
         videoQualityOption = findViewById(R.id.video_quality_option)
         framerateOption = findViewById(R.id.framerate_option)
+        bitrateOption = findViewById(R.id.bitrate_option)
         updateVideoQualityLabel()
         updateFramerateLabel()
+        updateBitrateLabel()
 
         videoQualityOption.setOnClickListener { view ->
             showVideoQualityMenu(view)
@@ -32,25 +36,30 @@ class SettingsActivity : AppCompatActivity() {
         framerateOption.setOnClickListener { view ->
             showFramerateMenu(view)
         }
+
+        bitrateOption.setOnClickListener { view ->
+            showBitrateMenu(view)
+        }
     }
 
     private fun showVideoQualityMenu(view: View) {
         val popup = PopupMenu(this, view)
         popup.menuInflater.inflate(R.menu.video_quality_menu, popup.menu)
 
-        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedQualityId =
-            sharedPref.getInt(VIDEO_QUALITY_KEY, R.id.quality_1080p) // Default to 1080p
-        popup.menu.findItem(savedQualityId)?.isChecked = true
-
         popup.setOnMenuItemClickListener { item ->
-            item.isChecked = true
+            val quality = when (item.itemId) {
+                R.id.quality_720p -> "720p"
+                R.id.quality_1080p -> "1080p"
+                R.id.quality_1440p -> "1440p"
+                else -> "1080p"
+            }
+
             val sharedPrefEditor = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            sharedPrefEditor.putInt(VIDEO_QUALITY_KEY, item.itemId)
+            sharedPrefEditor.putString(VIDEO_QUALITY_KEY, quality)
             sharedPrefEditor.apply()
 
             updateVideoQualityLabel()
-            Toast.makeText(this, "Selected quality: ${item.title}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Selected quality: $quality", Toast.LENGTH_SHORT).show()
             true
         }
         popup.show()
@@ -60,19 +69,41 @@ class SettingsActivity : AppCompatActivity() {
         val popup = PopupMenu(this, view)
         popup.menuInflater.inflate(R.menu.framerate_menu, popup.menu)
 
-        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedFramerateId =
-            sharedPref.getInt(FRAMERATE_KEY, R.id.framerate_60) // Default to 60 FPS
-        popup.menu.findItem(savedFramerateId)?.isChecked = true
-
         popup.setOnMenuItemClickListener { item ->
-            item.isChecked = true
+            val framerate = when (item.itemId) {
+                R.id.framerate_30 -> "30"
+                R.id.framerate_60 -> "60"
+                R.id.framerate_90 -> "90"
+                else -> "60"
+            }
             val sharedPrefEditor = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            sharedPrefEditor.putInt(FRAMERATE_KEY, item.itemId)
+            sharedPrefEditor.putString(FRAMERATE_KEY, framerate)
             sharedPrefEditor.apply()
 
             updateFramerateLabel()
-            Toast.makeText(this, "Selected framerate: ${item.title}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Selected framerate: $framerate FPS", Toast.LENGTH_SHORT).show()
+            true
+        }
+        popup.show()
+    }
+
+    private fun showBitrateMenu(view: View) {
+        val popup = PopupMenu(this, view)
+        popup.menuInflater.inflate(R.menu.bitrate_menu, popup.menu)
+
+        popup.setOnMenuItemClickListener { item ->
+            val bitrate = when (item.itemId) {
+                R.id.bitrate_5 -> "5"
+                R.id.bitrate_10 -> "10"
+                R.id.bitrate_15 -> "15"
+                else -> "10"
+            }
+            val sharedPrefEditor = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            sharedPrefEditor.putString(BITRATE_KEY, bitrate)
+            sharedPrefEditor.apply()
+
+            updateBitrateLabel()
+            Toast.makeText(this, "Selected bitrate: $bitrate Mbps", Toast.LENGTH_SHORT).show()
             true
         }
         popup.show()
@@ -80,27 +111,19 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun updateVideoQualityLabel() {
         val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedQualityId =
-            sharedPref.getInt(VIDEO_QUALITY_KEY, R.id.quality_1080p) // Default to 1080p
-        val quality = when (savedQualityId) {
-            R.id.quality_720p -> "720P"
-            R.id.quality_1080p -> "1080P"
-            R.id.quality_1440p -> "1440P"
-            else -> "1080P"
-        }
-        videoQualityOption.text = "Video Quality: $quality"
+        val quality = sharedPref.getString(VIDEO_QUALITY_KEY, "1080p")
+        videoQualityOption.text = "Video Quality: ${quality?.uppercase()}"
     }
 
     private fun updateFramerateLabel() {
         val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedFramerateId =
-            sharedPref.getInt(FRAMERATE_KEY, R.id.framerate_60) // Default to 60 FPS
-        val framerate = when (savedFramerateId) {
-            R.id.framerate_30 -> "30 FPS"
-            R.id.framerate_60 -> "60 FPS"
-            R.id.framerate_90 -> "90 FPS"
-            else -> "60 FPS"
-        }
-        framerateOption.text = "Framerate: $framerate"
+        val framerate = sharedPref.getString(FRAMERATE_KEY, "60")
+        framerateOption.text = "Framerate: $framerate FPS"
+    }
+
+    private fun updateBitrateLabel() {
+        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val bitrate = sharedPref.getString(BITRATE_KEY, "10")
+        bitrateOption.text = "Bitrate: $bitrate Mbps"
     }
 }

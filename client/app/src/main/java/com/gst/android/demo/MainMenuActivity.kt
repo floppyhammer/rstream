@@ -20,7 +20,7 @@ import com.gst.android.demo.databinding.ActivityMainMenuBinding
 class MainMenuActivity : AppCompatActivity() {
     private lateinit var editText: EditText
     private val PREFS_NAME = "MyPrefsFile"
-    private val TEXT_KEY = "host_ip"
+    private val HOST_IP_KEY = "host_ip"
     private lateinit var binding: ActivityMainMenuBinding
 
     private val UDP_PORT = 55555 // The port to listen on
@@ -62,7 +62,7 @@ class MainMenuActivity : AppCompatActivity() {
 
         binding.connectButton.setOnClickListener {
             val intent = Intent(this, StreamingActivity::class.java)
-            intent.putExtra(TEXT_KEY, editText.text.toString())
+            intent.putExtra(HOST_IP_KEY, editText.text.toString())
             startActivity(intent)
         }
 
@@ -74,7 +74,7 @@ class MainMenuActivity : AppCompatActivity() {
         editText = findViewById(R.id.editTextText)
 
         val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedText = sharedPref.getString(TEXT_KEY, "")
+        val savedText = sharedPref.getString(HOST_IP_KEY, "")
         editText.setText(savedText)
 
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
@@ -105,8 +105,22 @@ class MainMenuActivity : AppCompatActivity() {
             setBackgroundColor(ContextCompat.getColor(context, android.R.color.darker_gray))
             setPadding(16, 16, 16, 16)
             setOnClickListener {
+                val sharedPref = getSharedPreferences("SettingsPrefs", Context.MODE_PRIVATE)
+                val videoQuality = sharedPref.getString("video_quality", "1080p")
+                val framerate = sharedPref.getString("framerate", "60")
+                val bitrate = sharedPref.getString("bitrate", "10")
+
                 val intent = Intent(this@MainMenuActivity, StreamingActivity::class.java)
-                intent.putExtra(TEXT_KEY, ipAddress)
+                intent.putExtra(HOST_IP_KEY, ipAddress)
+                intent.putExtra("video_quality", videoQuality)
+                intent.putExtra("framerate", framerate)
+                intent.putExtra("bitrate", bitrate)
+
+                Log.i(
+                    "RStreamClient",
+                    "Starting stream for $ipAddress with quality: $videoQuality, framerate: $framerate, bitrate: $bitrate"
+                )
+
                 startActivity(intent)
             }
         }
@@ -137,7 +151,7 @@ class MainMenuActivity : AppCompatActivity() {
 
         val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         sharedPref.edit {
-            putString(TEXT_KEY, editText.text.toString())
+            putString(HOST_IP_KEY, editText.text.toString())
         }
     }
 

@@ -1,6 +1,7 @@
 package com.gst.android.demo
 
 import android.app.NativeActivity
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.os.Bundle
@@ -16,6 +17,12 @@ class StreamingActivity : NativeActivity() {
         volumeControlStream = AudioManager.STREAM_MUSIC
 
         super.onCreate(savedInstanceState, persistentState)
+
+        val videoQuality = intent.getStringExtra("video_quality")
+        val framerate = intent.getStringExtra("framerate")
+        val bitrate = intent.getStringExtra("bitrate")
+
+        Log.i("RStreamClient", "Received Video Quality: $videoQuality, Framerate: $framerate, Bitrate: $bitrate")
 
 //
 //        // Retrieve the intent extras

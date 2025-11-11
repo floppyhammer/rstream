@@ -40,8 +40,6 @@ struct MyState {
     int32_t h_margin;
     int32_t v_margin;
 
-    uint32_t bitrate;
-
     bool pressed;
     float press_pos_x;
     float press_pos_y;
@@ -63,6 +61,9 @@ struct MyState {
     MyStreamApp *stream_app;
 
     std::string host_ip;
+    std::string video_quality;
+    uint32_t framerate;
+    uint32_t bitrate;
 
     std::unique_ptr<Renderer> renderer;
 
@@ -556,6 +557,14 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             std::string websocket_uri = "ws://" + state_.host_ip + ":5600/ws";
             state_.connection = g_object_ref_sink(my_connection_new(websocket_uri.c_str(), state_.host_ip.c_str()));
 
+            StreamConfig config{};
+            config.video_width = 1920;
+            config.video_height = 1080;
+            config.framerate = state_.framerate;
+            config.bitrate = state_.bitrate;
+
+            my_connection_set_stream_config(state_.connection, &config);
+
             my_connection_connect(state_.connection);
 
             ALOGI("%s: starting stream client mainloop thread", __FUNCTION__);
@@ -644,6 +653,32 @@ void return_to_main_menu(struct android_app *app) {
     ANativeActivity_finish(app->activity);
 }
 
+std::string retrieve_data_string(JNIEnv *env, jobject intentObject, jmethodID getStringExtraMethod, const char *key) {
+    jstring keyString = env->NewStringUTF(key);
+
+    jstring nativeDataJString = (jstring)env->CallObjectMethod(intentObject, getStringExtraMethod, keyString);
+
+    std::string result;
+
+    // --- 4. Process the data and Clean Up ---
+    if (nativeDataJString != NULL) {
+        const char *finalData = env->GetStringUTFChars(nativeDataJString, 0);
+
+        result = finalData;
+
+        // Clean up
+        env->ReleaseStringUTFChars(nativeDataJString, finalData);
+        env->DeleteLocalRef(nativeDataJString);
+    } else {
+        ALOGI("Data key not found.");
+    }
+
+    // Final clean up
+    env->DeleteLocalRef(keyString);
+
+    return result;
+}
+
 void android_main(struct android_app *app) {
     JNIEnv *env = nullptr;
     (*app->activity->vm).AttachCurrentThread(&env, NULL);
@@ -651,7 +686,7 @@ void android_main(struct android_app *app) {
 
     app->onInputEvent = handle_input;
 
-    // Retrieve host IP.
+    // Retrieve data strings.
     {
         // The NativeActivity's Java object is available here:
         jobject nativeActivity = app->activity->clazz;
@@ -680,27 +715,17 @@ void android_main(struct android_app *app) {
         jmethodID getStringExtraMethod =
             env->GetMethodID(intentClass, "getStringExtra", "(Ljava/lang/String;)Ljava/lang/String;");
 
-        const char *DATA_KEY = "host_ip";
-        jstring keyString = env->NewStringUTF(DATA_KEY);
+        state_.host_ip = retrieve_data_string(env, intentObject, getStringExtraMethod, "host_ip");
+        state_.video_quality = retrieve_data_string(env, intentObject, getStringExtraMethod, "video_quality");
+        state_.framerate = std::stoi(retrieve_data_string(env, intentObject, getStringExtraMethod, "framerate"));
+        state_.bitrate = std::stoi(retrieve_data_string(env, intentObject, getStringExtraMethod, "bitrate"));
 
-        jstring nativeDataJString = (jstring)env->CallObjectMethod(intentObject, getStringExtraMethod, keyString);
+        ALOGI("Got intent strings from native: host_ip: %s video_quality: %s framerate: %d bitrate: %d",
+              state_.host_ip.c_str(),
+              state_.video_quality.c_str(),
+              state_.framerate,
+              state_.bitrate);
 
-        // --- 4. Process the data and Clean Up ---
-        if (nativeDataJString != NULL) {
-            const char *finalData = env->GetStringUTFChars(nativeDataJString, 0);
-
-            state_.host_ip = finalData;
-            ALOGI("host_ip received: %s", state_.host_ip.c_str());
-
-            // Clean up
-            env->ReleaseStringUTFChars(nativeDataJString, finalData);
-            env->DeleteLocalRef(nativeDataJString);
-        } else {
-            ALOGI("Data key not found.");
-        }
-
-        // Final clean up
-        env->DeleteLocalRef(keyString);
         env->DeleteLocalRef(intentClass);
         env->DeleteLocalRef(intentObject);
     }

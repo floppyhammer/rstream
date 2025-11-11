@@ -47,6 +47,8 @@ struct _MyConnection {
     GAsyncQueue *packet_queue;
 
     bool server_closed;
+
+    struct StreamConfig config;
 };
 
 G_DEFINE_TYPE(MyConnection, my_connection, G_TYPE_OBJECT)
@@ -407,6 +409,45 @@ static void conn_websocket_closed_cb(SoupWebsocketConnection *connection, MyConn
     conn->server_closed = true;
 }
 
+void my_connection_send_stream_config(MyConnection *conn) {
+    struct StreamConfig config = conn->config;
+
+    JsonBuilder *builder = json_builder_new();
+    json_builder_begin_object(builder);
+
+    json_builder_set_member_name(builder, "msg_type");
+    json_builder_add_string_value(builder, "config");
+
+    json_builder_set_member_name(builder, "video_width");
+    json_builder_add_int_value(builder, config.video_width);
+
+    json_builder_set_member_name(builder, "video_height");
+    json_builder_add_int_value(builder, config.video_height);
+
+    json_builder_set_member_name(builder, "framerate");
+    json_builder_add_int_value(builder, config.framerate);
+
+    json_builder_set_member_name(builder, "bitrate");
+    json_builder_add_int_value(builder, config.bitrate);
+
+    json_builder_set_member_name(builder, "pin");
+    json_builder_add_int_value(builder, config.pin);
+
+    json_builder_end_object(builder);
+
+    JsonNode *root = json_builder_get_root(builder);
+
+    gchar *msg_str = json_to_string(root, TRUE);
+    ALOGI("Sent stream config: %s", msg_str);
+
+    soup_websocket_connection_send_text(conn->ws, msg_str);
+
+    g_clear_pointer(&msg_str, g_free);
+
+    json_node_unref(root);
+    g_object_unref(builder);
+}
+
 static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyConnection *conn) {
     GError *error = NULL;
 
@@ -422,12 +463,7 @@ static void conn_websocket_connected_cb(GObject *session, GAsyncResult *res, MyC
     }
     g_assert_no_error(error);
 
-    struct StreamConfig config = {};
-    config.video_width = 1920;
-    config.video_height = 1080;
-    config.bitrate = 20; // Mbps
-    config.pin = 1234;
-    my_connection_send_stream_config(conn, &config);
+    my_connection_send_stream_config(conn);
 
     ALOGI("WebSocket connected");
 
@@ -622,42 +658,12 @@ bool my_connection_send_bytes(MyConnection *conn, GBytes *bytes) {
     return TRUE;
 }
 
-void my_connection_send_stream_config(MyConnection *conn, struct StreamConfig *config) {
-    JsonBuilder *builder = json_builder_new();
-    json_builder_begin_object(builder);
-
-    json_builder_set_member_name(builder, "msg_type");
-    json_builder_add_string_value(builder, "config");
-
-    json_builder_set_member_name(builder, "video_width");
-    json_builder_add_int_value(builder, config->video_width);
-
-    json_builder_set_member_name(builder, "video_height");
-    json_builder_add_int_value(builder, config->video_height);
-
-    json_builder_set_member_name(builder, "bitrate");
-    json_builder_add_int_value(builder, config->bitrate);
-
-    json_builder_set_member_name(builder, "pin");
-    json_builder_add_int_value(builder, config->pin);
-
-    json_builder_end_object(builder);
-
-    JsonNode *root = json_builder_get_root(builder);
-
-    gchar *msg_str = json_to_string(root, TRUE);
-    ALOGI("Sent stream config: %s", msg_str);
-
-    soup_websocket_connection_send_text(conn->ws, msg_str);
-
-    g_clear_pointer(&msg_str, g_free);
-
-    json_node_unref(root);
-    g_object_unref(builder);
-}
-
 bool my_connection_server_closed(MyConnection *conn) {
     return conn->server_closed;
+}
+
+void my_connection_set_stream_config(MyConnection *conn, struct StreamConfig *config) {
+    conn->config = *config;
 }
 
 const int COMMAND_SIZE = sizeof(InputCommand);

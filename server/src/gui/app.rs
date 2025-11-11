@@ -69,6 +69,7 @@ impl Default for App {
             let streaming_state = StreamingState {
                 peers: [].into(),
                 dpi_scale: 1.0,
+                framerate: 60,
                 bitrate: 20,
                 native_resolution: (1920, 1080),
                 stream_resolution: (1920, 1080),
@@ -214,15 +215,21 @@ impl eframe::App for App {
 
                 ui.add_space(8.0);
 
-                ui.horizontal(|ui| {
-                    ui.label(format!("Bitrate (Mbps): {}", self.config.bitrate));
-
-                    if ui.ui_contains_pointer() {
-                        egui::show_tooltip(ui.ctx(), egui::Id::new("bitrate_tooltip"), |ui| {
-                            ui.label("Change bitrate from client side.");
+                CollapsingHeader::new("Stream Info")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+                            if let Some(state) = guard.as_mut() {
+                                ui.label(format!(
+                                    "Resolution: {}x{}",
+                                    state.stream_resolution.0, state.stream_resolution.1
+                                ));
+                                ui.label(format!("Framerate (Hz): {}", state.framerate));
+                                ui.label(format!("Bitrate (Mbps): {}", state.bitrate));
+                            }
                         });
-                    }
-                });
+                    });
 
                 ui.add_space(8.0);
 
@@ -262,15 +269,9 @@ impl eframe::App for App {
                 CollapsingHeader::new("Host settings")
                     .default_open(true)
                     .show(ui, |ui| {
-                        ui.checkbox(option1_enabled, "Start hosting upon app startup");
+                        ui.checkbox(option1_enabled, "option1");
                         ui.checkbox(option2_enabled, "option2");
                     });
-
-                ui.add_space(8.0);
-
-                if ui.button("Host").clicked() {
-                    println!("Host");
-                }
 
                 ui.add_space(8.0);
 

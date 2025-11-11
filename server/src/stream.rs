@@ -40,6 +40,7 @@ pub struct Peer {
 pub struct StreamingState {
     pub(crate) peers: HashMap<SocketAddr, Peer>,
     pub(crate) dpi_scale: f32,
+    pub(crate) framerate: u32,
     pub(crate) bitrate: u32,
     pub(crate) native_resolution: (u32, u32),
     pub(crate) stream_resolution: (u32, u32),
@@ -84,7 +85,7 @@ fn check_factory_exists(factory_name: &str) -> bool {
     gst::ElementFactory::find(factory_name).is_some()
 }
 
-fn start_gstreamer_pipeline(addr: SocketAddr) {
+fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     // Acquire the lock for the global pipeline state
     let mut guard = PIPELINE_GUARD.lock().unwrap();
 
@@ -98,30 +99,27 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
 
     let found_amf = check_factory_exists("amfh264enc");
 
-    let stream_resolution;
-    {
-        let mut state_lock = STREAMING_STATE_GUARD.lock().unwrap();
-        let state = state_lock
-            .as_mut()
-            .expect("Streaming state was not initialized!");
-        stream_resolution = state.stream_resolution;
-    }
-
     let encoder_str = if found_amf {
         println!("amfh264enc is available.");
 
         format!(
             "d3d11convert ! \
-        video/x-raw(memory:D3D11Memory),width={},height={},format=NV12,framerate=60/1 ! \
-        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate=20000 ! ",
-            stream_resolution.0, stream_resolution.1
+        video/x-raw(memory:D3D11Memory),width={},height={},format=NV12,framerate={}/1 ! \
+        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate={} ! ",
+            config.video_width,
+            config.video_height,
+            config.framerate,
+            config.bitrate * 1024
         )
     } else {
         format!("videoconvert ! \
         videoscale ! \
-        video/x-raw,width={},height={},format=NV12,framerate=60/1 ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate=20000 key-int-max=120 ! ",
-                stream_resolution.0, stream_resolution.1
+        video/x-raw,width={},height={},format=NV12,framerate={}/1 ! \
+        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate={} key-int-max=120 ! ",
+                config.video_width,
+                config.video_height,
+                config.framerate,
+                config.bitrate * 1024
         )
     };
 
@@ -136,6 +134,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr) {
         rtpbin. ! \
         udpsink name=videoudpsrc host={} port=5601 sync=false \
         wasapi2src loopback=true low-latency=true ! \
+        queue ! \
         audioconvert ! \
         audioresample ! \
         opusenc perfect-timestamp=false audio-type=restricted-lowdelay bitrate-type=cbr ! \
@@ -253,11 +252,6 @@ async fn handle_connection(
     start_once.call_once(start_pipe);
     // ---------------------------------------------------
 
-    // Spawn a task to run the blocking pipeline start function
-    task::spawn_blocking(move || {
-        start_gstreamer_pipeline(addr);
-    });
-
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
     peer_map.lock().unwrap().insert(addr, tx);
@@ -270,7 +264,7 @@ async fn handle_connection(
             // Handle the incoming message/command
             if msg.is_text() {
                 let text_msg = msg.clone();
-                handle_text_message(text_msg);
+                handle_text_message(text_msg, addr);
             }
 
             let peers = peer_map.lock().unwrap();
@@ -339,12 +333,13 @@ pub struct StreamConfigMessage {
     pub msg_type: String,
     pub video_width: u32,
     pub video_height: u32,
+    pub framerate: u32,
     pub bitrate: u32,
     pub pin: u32,
 }
 
 // Video control via WebSocket.
-fn handle_text_message(msg: Message) {
+fn handle_text_message(msg: Message, addr: SocketAddr) {
     let text = match msg {
         Message::Text(t) => t,
         _ => return, // Handle other message types
@@ -360,6 +355,20 @@ fn handle_text_message(msg: Message) {
             );
             println!("  Bitrate: {}", config_msg.bitrate);
             println!("  PIN: {}", config_msg.pin);
+
+            {
+                let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+                if let Some(state) = guard.as_mut() {
+                    state.stream_resolution = (config_msg.video_width, config_msg.video_height);
+                    state.framerate = config_msg.framerate;
+                    state.bitrate = config_msg.bitrate;
+                }
+            }
+
+            // Spawn a task to run the blocking pipeline start function
+            task::spawn_blocking(move || {
+                start_gstreamer_pipeline(addr, config_msg);
+            });
         }
         Err(e) => {
             eprintln!("❌ ERROR: Failed to deserialize JSON: {}", e);

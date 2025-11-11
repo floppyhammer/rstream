@@ -504,7 +504,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     GError *error = NULL;
 
     gchar *pipeline_string = g_strdup_printf(
-        "rtpbin name=rtpbin latency=10 "
+        "rtpbin name=rtpbin latency=200 "
         // Video
         "udpsrc name=videoudpsrc port=5601 buffer-size=1000000 "
         "caps=\"application/x-rtp,media=video,payload=96,clock-rate=90000,encoding-name=H264\" ! "
@@ -514,7 +514,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
         "decodebin3 ! "
         "glsinkbin name=glsink "
         // Audio
-        "udpsrc name=audioudpsrc port=5602 buffer-size=1000000 "
+        "udpsrc name=audioudpsrc port=5602 "
         "caps=\"application/x-rtp,media=audio,payload=127,clock-rate=48000,encoding-name=OPUS\" ! "
         "rtpbin.recv_rtp_sink_1 "
         "rtpbin. ! "

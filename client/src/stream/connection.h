@@ -46,8 +46,8 @@ void my_connection_send_input_event(MyConnection *conn, int type, float x, float
  */
 void my_connection_set_pipeline(MyConnection *conn, GstPipeline *pipeline);
 
-void my_connection_send_stream_config(MyConnection *conn, struct StreamConfig *config);
-
 bool my_connection_server_closed(MyConnection *conn);
+
+void my_connection_set_stream_config(MyConnection *conn, struct StreamConfig *config);
 
 G_END_DECLS
