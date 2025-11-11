@@ -16,15 +16,13 @@
             android:text="Discovered Hosts"
             android:textSize="24dp" />
 
-        <TableLayout
-            android:id="@+id/hosts_table"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/hosts_recycler_view"
             android:layout_width="match_parent"
             android:layout_height="265dp"
             android:background="#000000"
             android:padding="1dp"
-            android:stretchColumns="0">
-            <!-- Rows will be added here dynamically -->
-        </TableLayout>
+            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -50,7 +48,7 @@
         <Button
             android:id="@+id/settings_button"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_height="60dp"
             android:layout_gravity="center_horizontal"
             android:text="Settings" />
     </LinearLayout>
