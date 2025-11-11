@@ -2,6 +2,7 @@ package com.gst.android.demo
 
 import android.content.Context
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -43,10 +44,21 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showVideoQualityMenu(view: View) {
-        val popup = PopupMenu(this, view)
+        val popup = PopupMenu(this, view, Gravity.END)
         popup.menuInflater.inflate(R.menu.video_quality_menu, popup.menu)
 
+        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedQuality = sharedPref.getString(VIDEO_QUALITY_KEY, "1080p")
+        val itemId = when (savedQuality) {
+            "720p" -> R.id.quality_720p
+            "1080p" -> R.id.quality_1080p
+            "1440p" -> R.id.quality_1440p
+            else -> R.id.quality_1080p
+        }
+        popup.menu.findItem(itemId).isChecked = true
+
         popup.setOnMenuItemClickListener { item ->
+            item.isChecked = true
             val quality = when (item.itemId) {
                 R.id.quality_720p -> "720p"
                 R.id.quality_1080p -> "1080p"
@@ -66,10 +78,21 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showFramerateMenu(view: View) {
-        val popup = PopupMenu(this, view)
+        val popup = PopupMenu(this, view, Gravity.END)
         popup.menuInflater.inflate(R.menu.framerate_menu, popup.menu)
 
+        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedFramerate = sharedPref.getString(FRAMERATE_KEY, "60")
+        val itemId = when (savedFramerate) {
+            "30" -> R.id.framerate_30
+            "60" -> R.id.framerate_60
+            "90" -> R.id.framerate_90
+            else -> R.id.framerate_60
+        }
+        popup.menu.findItem(itemId).isChecked = true
+
         popup.setOnMenuItemClickListener { item ->
+            item.isChecked = true
             val framerate = when (item.itemId) {
                 R.id.framerate_30 -> "30"
                 R.id.framerate_60 -> "60"
@@ -88,10 +111,21 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showBitrateMenu(view: View) {
-        val popup = PopupMenu(this, view)
+        val popup = PopupMenu(this, view, Gravity.END)
         popup.menuInflater.inflate(R.menu.bitrate_menu, popup.menu)
 
+        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedBitrate = sharedPref.getString(BITRATE_KEY, "10")
+        val itemId = when (savedBitrate) {
+            "5" -> R.id.bitrate_5
+            "10" -> R.id.bitrate_10
+            "15" -> R.id.bitrate_15
+            else -> R.id.bitrate_10
+        }
+        popup.menu.findItem(itemId).isChecked = true
+
         popup.setOnMenuItemClickListener { item ->
+            item.isChecked = true
             val bitrate = when (item.itemId) {
                 R.id.bitrate_5 -> "5"
                 R.id.bitrate_10 -> "10"
