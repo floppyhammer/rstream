@@ -11,6 +11,7 @@ use std::net::{SocketAddr, UdpSocket};
 use std::str::FromStr;
 use std::sync::{Mutex, Once};
 use vigem_client::{self as vigem, Client, TargetId, XButtons, XGamepad, Xbox360Wired};
+use windows::core::s;
 
 // --- ENet Configuration ---
 const ENET_PORT: u16 = 7777; // Dedicated ENet port for input
@@ -252,12 +253,16 @@ fn handle_enet_packet(packet: &enet::Packet) {
     let native_resolution;
     let stream_resolution;
     {
-        let mut state_lock = STREAMING_STATE_GUARD.lock().unwrap();
+        let state_lock = STREAMING_STATE_GUARD.lock().unwrap();
         let state = state_lock
-            .as_mut()
+            .as_ref()
             .expect("Streaming state was not initialized!");
         native_resolution = state.native_resolution;
-        stream_resolution = state.stream_resolution;
+        if let Some(config) = state.stream_config.as_ref() {
+            stream_resolution = config.resolution;
+        } else {
+            return;
+        }
     }
 
     let x: f32 = f32::from_bits(command.data0);

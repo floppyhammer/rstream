@@ -4,7 +4,6 @@ use crate::input::{init_enigo, init_vigem, run_enet_server, ENIGO_GUARD};
 use crate::stream::{run_websocket, Peer, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
 use chrono;
-use chrono::Utc;
 use eframe::egui;
 use eframe::egui::{CollapsingHeader, DragValue, ViewportCommand, Visuals};
 use eframe::glow::Context;
@@ -28,9 +27,6 @@ enum BuildStatus {
     Fail,
 }
 
-/// We derive Deserialize/Serialize so we can persist app state on shutdown.
-#[cfg_attr(feature = "persistence", derive(serde::Deserialize, serde::Serialize))]
-#[cfg_attr(feature = "persistence", serde(default))] // if we add new fields, give them default values when deserializing old state
 pub struct App {
     config: Config,
 
@@ -69,10 +65,8 @@ impl Default for App {
             let streaming_state = StreamingState {
                 peers: [].into(),
                 dpi_scale: 1.0,
-                framerate: 60,
-                bitrate: 20,
                 native_resolution: (1920, 1080),
-                stream_resolution: (1920, 1080),
+                stream_config: None,
             };
             *guard = Some(streaming_state);
         }
@@ -220,13 +214,17 @@ impl eframe::App for App {
                     .show(ui, |ui| {
                         ui.vertical(|ui| {
                             let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
-                            if let Some(state) = guard.as_mut() {
-                                ui.label(format!(
-                                    "Resolution: {}x{}",
-                                    state.stream_resolution.0, state.stream_resolution.1
-                                ));
-                                ui.label(format!("Framerate (Hz): {}", state.framerate));
-                                ui.label(format!("Bitrate (Mbps): {}", state.bitrate));
+                            if let Some(state) = guard.as_ref() {
+                                if let Some(config) = state.stream_config.as_ref() {
+                                    ui.label(format!(
+                                        "Resolution: {}x{}",
+                                        config.resolution.0, config.resolution.1
+                                    ));
+                                    ui.label(format!("Framerate (Hz): {}", config.framerate));
+                                    ui.label(format!("Bitrate (Mbps): {}", config.bitrate));
+                                } else {
+                                    ui.label("Disconnected");
+                                }
                             }
                         });
                     });

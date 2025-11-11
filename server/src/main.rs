@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_position([200.0, 200.0])
-            .with_inner_size([240.0, 480.0])
+            .with_inner_size([480.0, 360.0])
             .with_drag_and_drop(true),
         ..Default::default()
     };

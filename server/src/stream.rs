@@ -37,13 +37,17 @@ pub struct Peer {
     pub(crate) time_connected: String,
 }
 
+pub struct StreamConfig {
+    pub(crate) resolution: (u32, u32),
+    pub(crate) framerate: u32,
+    pub(crate) bitrate: u32,
+}
+
 pub struct StreamingState {
     pub(crate) peers: HashMap<SocketAddr, Peer>,
     pub(crate) dpi_scale: f32,
-    pub(crate) framerate: u32,
-    pub(crate) bitrate: u32,
     pub(crate) native_resolution: (u32, u32),
-    pub(crate) stream_resolution: (u32, u32),
+    pub(crate) stream_config: Option<StreamConfig>,
 }
 
 pub static STREAMING_STATE_GUARD: Mutex<Option<StreamingState>> = Mutex::new(None);
@@ -359,9 +363,13 @@ fn handle_text_message(msg: Message, addr: SocketAddr) {
             {
                 let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
                 if let Some(state) = guard.as_mut() {
-                    state.stream_resolution = (config_msg.video_width, config_msg.video_height);
-                    state.framerate = config_msg.framerate;
-                    state.bitrate = config_msg.bitrate;
+                    let config = StreamConfig {
+                        resolution: (config_msg.video_width, config_msg.video_height),
+                        framerate: config_msg.framerate,
+                        bitrate: config_msg.bitrate,
+                    };
+
+                    state.stream_config = Some(config);
                 }
             }
 
