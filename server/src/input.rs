@@ -10,12 +10,11 @@ use std::io::Error as IoError;
 use std::net::{SocketAddr, UdpSocket};
 use std::str::FromStr;
 use std::sync::{Mutex, Once};
-use vigem_client::{self as vigem, Client, TargetId, XButtons, XGamepad, Xbox360Wired};
-use windows::core::s;
+use vigem_client::{self as vigem, Client, TargetId, XGamepad, Xbox360Wired};
 
 // --- ENet Configuration ---
 const ENET_PORT: u16 = 7777; // Dedicated ENet port for input
-const ENET_CHANNEL_INPUT: u8 = 0; // Channel 0 for reliable input commands
+// const ENET_CHANNEL_INPUT: u8 = 0; // Channel 0 for reliable input commands
 
 // A thread-safe global container for the Enigo instance.
 // Mutex: Ensures exclusive access when a thread is using Enigo.
@@ -104,8 +103,8 @@ pub async fn run_enet_server() -> Result<(), IoError> {
                         println!("ENet peer {} disconnected", peer.id().0);
                     }
                     enet::Event::Receive {
-                        peer,
-                        channel_id,
+                        peer: _,
+                        channel_id: _,
                         packet,
                     } => {
                         handle_enet_packet(&packet);

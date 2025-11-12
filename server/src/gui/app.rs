@@ -1,25 +1,18 @@
 use crate::discovery::run_announcer;
 use crate::gui::config::{Config, PeerManagementType};
-use crate::input::{init_enigo, init_vigem, run_enet_server, ENIGO_GUARD};
-use crate::stream::{run_websocket, Peer, StreamingState, STREAMING_STATE_GUARD};
+use crate::input::{init_enigo, init_vigem, run_enet_server};
+use crate::stream::{run_websocket, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
-use chrono;
 use eframe::egui;
-use eframe::egui::{CollapsingHeader, DragValue, ViewportCommand, Visuals};
+use eframe::egui::{CollapsingHeader, ViewportCommand, Visuals};
 use eframe::glow::Context;
 use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
-use enigo::{Enigo, Settings};
-use futures::future;
 use local_ip_address::list_afinet_netifas;
-use std::ops::RangeInclusive;
-use std::os::windows::process::CommandExt;
-use std::process::Command;
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex, Once};
-use std::{str, thread};
-use tray_icon::menu::{MenuEvent, MenuEventReceiver, MenuId};
+use std::sync::{mpsc, Arc, Mutex};
+use tray_icon::menu::{MenuEvent, MenuId};
 
 enum BuildStatus {
     None,
@@ -40,7 +33,7 @@ pub struct App {
 
     pending_cmd_count: i32,
 
-    sender: Arc<Mutex<Sender<(String, bool)>>>,
+    _sender: Arc<Mutex<Sender<(String, bool)>>>,
     receiver: Receiver<(String, bool)>,
 
     pub(crate) tray_menu_quit_id: Option<MenuId>,
@@ -76,17 +69,17 @@ impl Default for App {
 
         init_vigem();
 
-        let ws_handle = task::spawn(run_websocket(5600));
+        let _ws_handle = task::spawn(run_websocket(5600));
 
-        let enet_handle = task::spawn(run_enet_server());
+        let _enet_handle = task::spawn(run_enet_server());
 
         let network_interfaces = list_afinet_netifas().unwrap();
 
-        for (name, ip) in network_interfaces.iter() {
+        for (_name, ip) in network_interfaces.iter() {
             if ip.is_ipv4() {
                 let local_ip = ip.to_string();
                 if local_ip.starts_with("192.168.") || local_ip.starts_with("10.11.") {
-                    let announcer_handle = task::spawn(run_announcer(local_ip));
+                    let _announcer_handle = task::spawn(run_announcer(local_ip));
                 }
             }
         }
@@ -103,7 +96,7 @@ impl Default for App {
 
             pending_cmd_count: 0,
 
-            sender: Arc::new(Mutex::new(sender)),
+            _sender: Arc::new(Mutex::new(sender)),
             receiver,
             tray_menu_quit_id: None,
         }
@@ -118,12 +111,12 @@ fn get_scale_factor(ctx: &egui::Context) -> f32 {
     })
 }
 
-fn get_window_logical_resolution(ctx: &egui::Context) -> egui::Vec2 {
-    ctx.input(|i| {
-        // The screen_rect is the full size of the viewport/window in logical points.
-        i.screen_rect.size()
-    })
-}
+// fn get_window_logical_resolution(ctx: &egui::Context) -> egui::Vec2 {
+//     ctx.input(|i| {
+//         // The screen_rect is the full size of the viewport/window in logical points.
+//         i.screen_rect.size()
+//     })
+// }
 
 impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
@@ -213,7 +206,7 @@ impl eframe::App for App {
                     .default_open(true)
                     .show(ui, |ui| {
                         ui.vertical(|ui| {
-                            let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+                            let guard = STREAMING_STATE_GUARD.lock().unwrap();
                             if let Some(state) = guard.as_ref() {
                                 if let Some(config) = state.stream_config.as_ref() {
                                     ui.label(format!(
@@ -362,30 +355,4 @@ impl eframe::App for App {
         // Running a final stop ensures cleanup if possible.
         crate::stream::stop_gstreamer_pipeline()
     }
-}
-
-fn run_powershell_cmd(cmd_lines: &mut Vec<String>) -> (String, bool) {
-    let output = if cfg!(target_os = "windows") {
-        // See https://stackoverflow.com/questions/60750113/how-do-i-hide-the-console-window-for-a-process-started-with-stdprocesscomman
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-        Command::new("powershell")
-            .args(cmd_lines)
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .expect("failed to execute process")
-    } else {
-        panic!("Only Window is supported!");
-    };
-
-    let out = output.stdout;
-    let err = output.stderr;
-
-    let (output_str, res) = if err.is_empty() {
-        (str::from_utf8(&out).unwrap(), true)
-    } else {
-        (str::from_utf8(&err).unwrap(), false)
-    };
-
-    (output_str.to_owned(), res)
 }

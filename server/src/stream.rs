@@ -10,9 +10,7 @@ use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     future, pin_mut,
 };
-use gstreamer::get_timestamp;
 use serde::{Deserialize, Serialize};
-use std::io::pipe;
 use std::{
     collections::HashMap,
     io::Error as IoError,
@@ -65,25 +63,25 @@ fn init_gstreamer() {
     });
 }
 
-fn udpsrc_sink_pad_probe(_pad: &gst::Pad, info: &mut gst::PadProbeInfo) -> gst::PadProbeReturn {
-    if let Some(gst::PadProbeData::Buffer(ref buffer)) = info.data {
-        // Acquire the lock for the global pipeline state.
-        let mut guard = PIPELINE_GUARD.lock().unwrap();
-
-        // Use `Option::take()` to extract the pipeline and replace the value with None.
-        // The extracted pipeline reference will then be dropped when it goes out of scope.
-        if let Some(pipeline) = guard.as_ref() {
-            // Check pipeline
-            let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
-            let dot_str = dot_data.as_str();
-            let a = 2;
-            let b = 2;
-            let c = a + b;
-        }
-    }
-
-    gst::PadProbeReturn::Ok
-}
+// fn udpsrc_sink_pad_probe(_pad: &gst::Pad, info: &mut gst::PadProbeInfo) -> gst::PadProbeReturn {
+//     if let Some(gst::PadProbeData::Buffer(ref buffer)) = info.data {
+//         // Acquire the lock for the global pipeline state.
+//         let mut guard = PIPELINE_GUARD.lock().unwrap();
+//
+//         // Use `Option::take()` to extract the pipeline and replace the value with None.
+//         // The extracted pipeline reference will then be dropped when it goes out of scope.
+//         if let Some(pipeline) = guard.as_ref() {
+//             // Check pipeline
+//             let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
+//             let dot_str = dot_data.as_str();
+//             let a = 2;
+//             let b = 2;
+//             let c = a + b;
+//         }
+//     }
+//
+//     gst::PadProbeReturn::Ok
+// }
 
 fn check_factory_exists(factory_name: &str) -> bool {
     gst::ElementFactory::find(factory_name).is_some()
@@ -188,8 +186,8 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     // }
 
     // Check pipeline
-    let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
-    let dot_str = dot_data.as_str();
+    // let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
+    // let _dot_str = dot_data.as_str();
 
     // Store the running pipeline in the global Mutex
     *guard = Some(pipeline.clone());

@@ -1,6 +1,5 @@
 use async_std::task;
 use chrono::Utc;
-use local_ip_address::{list_afinet_netifas, local_ip};
 use std::io;
 use std::io::Error as IoError;
 use std::net::{Ipv4Addr, UdpSocket};
@@ -40,8 +39,8 @@ pub(crate) async fn run_announcer(local_ip: String) -> Result<(), IoError> {
         loop {
             // 3. Send the broadcast packet
             match socket.send_to(message_bytes, broadcast_target) {
-                Ok(bytes_sent) => {
-                    let now_utc = Utc::now();
+                Ok(_bytes_sent) => {
+                    let _now_utc = Utc::now();
                     // println!("[{}] Sent {} bytes.", now_utc, DISCOVERY_MESSAGE);
                 }
                 Err(e) => {

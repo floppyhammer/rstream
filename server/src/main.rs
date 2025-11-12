@@ -12,10 +12,9 @@ mod stream;
 use eframe::egui;
 use eframe::egui::{Style, Visuals};
 use std::env;
-use std::process::id;
 use std::sync::Mutex;
-use tray_icon::menu::{Menu, MenuEvent, MenuItem};
-use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent, TrayIconId};
+use tray_icon::menu::{Menu, MenuItem};
+use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE, SW_SHOWDEFAULT};
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
@@ -116,7 +115,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     _ => return,
                 }
 
-                let event_id = event.id().clone();
+                let _event_id = event.id().clone();
 
                 // match event_id {
                 //     // Compare the event's ID with the stored IDs
