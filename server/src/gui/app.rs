@@ -2,6 +2,7 @@ use crate::discovery::run_announcer;
 use crate::gui::config::{Config, PeerManagementType};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::{run_websocket, StreamingState, STREAMING_STATE_GUARD};
+use crate::VISIBLE;
 use async_std::task;
 use eframe::egui;
 use eframe::egui::{CollapsingHeader, ViewportCommand, Visuals};
@@ -9,15 +10,19 @@ use eframe::glow::Context;
 use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
+use enigo::Key::C;
 use local_ip_address::list_afinet_netifas;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use tray_icon::menu::{MenuEvent, MenuId};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
-enum BuildStatus {
-    None,
-    Success,
-    Fail,
+enum ConnectionStatus {
+    Ready,
+    Connected,
+    Error,
 }
 
 pub struct App {
@@ -29,12 +34,7 @@ pub struct App {
 
     terminal_output: String,
 
-    build_status: BuildStatus,
-
-    pending_cmd_count: i32,
-
-    _sender: Arc<Mutex<Sender<(String, bool)>>>,
-    receiver: Receiver<(String, bool)>,
+    connection_status: ConnectionStatus,
 
     pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
@@ -50,8 +50,6 @@ impl Default for App {
                 println!("No config file found, created a new one.")
             }
         }
-
-        let (sender, receiver) = mpsc::channel();
 
         {
             let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
@@ -92,12 +90,8 @@ impl Default for App {
 
             terminal_output: String::new(),
 
-            build_status: BuildStatus::None,
+            connection_status: ConnectionStatus::Ready,
 
-            pending_cmd_count: 0,
-
-            _sender: Arc::new(Mutex::new(sender)),
-            receiver,
             tray_menu_quit_id: None,
         }
     }
@@ -122,6 +116,17 @@ impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        let close_requested = ctx.input(|i| i.viewport().close_requested());
+        if close_requested {
+            let mut visible = VISIBLE.lock().unwrap();
+
+            if *visible {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                *visible = false;
+            }
+        }
+
         {
             let scale_factor = get_scale_factor(ctx);
             if let Some(mut monitor_logical_size) = ctx.input(|i| i.viewport().monitor_size) {
@@ -156,7 +161,7 @@ impl eframe::App for App {
             option1_enabled,
             option2_enabled,
             terminal_output,
-            build_status,
+            connection_status,
             ..
         } = self;
 
@@ -189,8 +194,37 @@ impl eframe::App for App {
                         TextEdit::singleline(&mut self.config.pin).desired_width(32.0),
                     );
 
-                    if ui.button("Regenerate").clicked() {
+                    let enable_pin_change;
+
+                    match connection_status {
+                        ConnectionStatus::Ready => {
+                            enable_pin_change = true;
+                        }
+                        ConnectionStatus::Connected => {
+                            enable_pin_change = false;
+                        }
+                        ConnectionStatus::Error => {
+                            enable_pin_change = true;
+                        }
+                    }
+
+                    let button_response =
+                        ui.add_enabled(enable_pin_change, egui::Button::new("Regenerate"));
+
+                    if button_response.clicked() {
                         self.config.pin = crate::gui::config::generate_pin(4);
+                    }
+
+                    match connection_status {
+                        ConnectionStatus::Ready => {
+                            ui.colored_label(Color32::YELLOW, "READY");
+                        }
+                        ConnectionStatus::Connected => {
+                            ui.colored_label(Color32::GREEN, "CONNECTED");
+                        }
+                        ConnectionStatus::Error => {
+                            ui.colored_label(Color32::RED, "ERROR");
+                        }
                     }
 
                     if ui.ui_contains_pointer() {
@@ -293,42 +327,6 @@ impl eframe::App for App {
                 //     let output = TextEdit::multiline(terminal_output).interactive(true);
                 //     ui.add(output);
                 // });
-
-                match self.receiver.try_recv() {
-                    Ok(value) => {
-                        let (output_string, res) = value;
-
-                        if res {
-                            // Update the count of the pending cmds.
-                            self.pending_cmd_count -= 1;
-
-                            // All cmds have finished successfully. Build succeeds.
-                            if self.pending_cmd_count == 0 {
-                                *build_status = BuildStatus::Success;
-                            }
-                        } else {
-                            // If any cmd fails, the build fails.
-                            // And clear pending cmds.
-                            *build_status = BuildStatus::Fail;
-                            self.pending_cmd_count = 0;
-                        }
-
-                        terminal_output.push_str(&output_string);
-                    }
-                    Err(_) => {}
-                }
-
-                match build_status {
-                    BuildStatus::None => {
-                        ui.colored_label(Color32::YELLOW, "");
-                    }
-                    BuildStatus::Success => {
-                        ui.colored_label(Color32::GREEN, "Build succeeded.");
-                    }
-                    BuildStatus::Fail => {
-                        ui.colored_label(Color32::RED, "Build failed!");
-                    }
-                }
             });
         });
 
