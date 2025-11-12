@@ -12,7 +12,7 @@ import android.view.WindowManager
 
 class StreamingActivity : NativeActivity() {
     override fun onCreate(savedInstanceState: Bundle?, persistentState: PersistableBundle?) {
-        Log.i("RStreamClient", "StreamingActivity: onCreate")
+        Log.d("RStreamClient", "StreamingActivity: onCreate")
 
         volumeControlStream = AudioManager.STREAM_MUSIC
 
@@ -22,7 +22,7 @@ class StreamingActivity : NativeActivity() {
         val framerate = intent.getStringExtra("framerate")
         val bitrate = intent.getStringExtra("bitrate")
 
-        Log.i("RStreamClient", "Received Video Quality: $videoQuality, Framerate: $framerate, Bitrate: $bitrate")
+        Log.d("RStreamClient", "Received Video Quality: $videoQuality, Framerate: $framerate, Bitrate: $bitrate")
 
 //
 //        // Retrieve the intent extras
@@ -56,35 +56,35 @@ class StreamingActivity : NativeActivity() {
     }
 
     override fun onStart() {
-        Log.i("RStreamClient", "StreamingActivity: onStart")
+        Log.d("RStreamClient", "StreamingActivity: onStart")
 
         super.onStart()
     }
 
     override fun onPause() {
-        Log.i("RStreamClient", "StreamingActivity: onPause")
+        Log.d("RStreamClient", "StreamingActivity: onPause")
 
         super.onPause()
     }
 
     override fun onStop() {
-        Log.i("RStreamClient", "StreamingActivity: onStop")
+        Log.d("RStreamClient", "StreamingActivity: onStop")
 
         super.onStop()
     }
 
     override fun onDestroy() {
-        Log.i("RStreamClient", "StreamingActivity: onDestroy")
+        Log.d("RStreamClient", "StreamingActivity: onDestroy")
 
         super.onDestroy()
     }
 
     companion object {
         init {
-            Log.i("RStreamClient", "StreamingActivity: static init")
+            Log.d("RStreamClient", "StreamingActivity: static init")
 
             System.loadLibrary("rstream_client")
-            Log.i("RStreamClient", "StreamingActivity: loaded rstream_client.so")
+            Log.d("RStreamClient", "StreamingActivity: loaded rstream_client.so")
         }
     }
 }

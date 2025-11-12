@@ -91,7 +91,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
     int32_t action = AKeyEvent_getAction(event);
     int32_t key_code = AKeyEvent_getKeyCode(event);
 
-    ALOGE("Gamepad source %d, action %d, key code %d", source, action, key_code);
+//    ALOGI("Gamepad source %d, action %d, key code %d", source, action, key_code);
 
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         if (source & AINPUT_SOURCE_JOYSTICK) {
@@ -109,21 +109,21 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             float rt_value = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RTRIGGER, 0);
 
             if (abs(state_.prev_lt - lt_value) > 0.001) {
-                ALOGI("Gamepad Left Trigger pressed: %.3f", lt_value);
+                ALOGD("Gamepad Left Trigger pressed: %.3f", lt_value);
                 state_.prev_lt = lt_value;
                 my_connection_send_input_event(state_.connection, InputType::GamepadButtonLT, lt_value, 0);
                 return 1;
             }
 
             if (abs(state_.prev_rt - rt_value) > 0.001) {
-                ALOGI("Gamepad Right Trigger pressed: %.3f", rt_value);
+                ALOGD("Gamepad Right Trigger pressed: %.3f", rt_value);
                 state_.prev_rt = rt_value;
                 my_connection_send_input_event(state_.connection, InputType::GamepadButtonRT, rt_value, 0);
                 return 1;
             }
 
             if (abs(state_.prev_lx - lx) > 0.001 || abs(state_.prev_ly - ly) > 0.001) {
-                ALOGI("Gamepad JOYSTICK L(%.1f, %.1f) ", lx, ly);
+                ALOGD("Gamepad JOYSTICK L(%.1f, %.1f) ", lx, ly);
                 state_.prev_lx = lx;
                 state_.prev_ly = ly;
                 my_connection_send_input_event(state_.connection,
@@ -134,7 +134,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
             }
 
             if (abs(state_.prev_rx - rx) > 0.001 || abs(state_.prev_ry - ry) > 0.001) {
-                ALOGI("Gamepad JOYSTICK R(%.1f, %.1f)", rx, ry);
+                ALOGD("Gamepad JOYSTICK R(%.1f, %.1f)", rx, ry);
                 state_.prev_rx = rx;
                 state_.prev_ry = ry;
                 my_connection_send_input_event(state_.connection,
@@ -159,7 +159,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                pressed ? 1 : 0,
                                                0);
 
-                ALOGI("Gamepad A pressed: %d", pressed);
+                ALOGD("Gamepad A pressed: %d", pressed);
             } break;
             case AKEYCODE_BUTTON_B: {
                 my_connection_send_input_event(state_.connection,
@@ -167,7 +167,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                pressed ? 1 : 0,
                                                0);
 
-                ALOGI("Gamepad B pressed: %d", pressed);
+                ALOGD("Gamepad B pressed: %d", pressed);
             } break;
             case AKEYCODE_BUTTON_X: {
                 my_connection_send_input_event(state_.connection,
@@ -175,7 +175,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                pressed ? 1 : 0,
                                                0);
 
-                ALOGI("Gamepad X pressed: %d", pressed);
+                ALOGD("Gamepad X pressed: %d", pressed);
             } break;
             case AKEYCODE_BUTTON_Y: {
                 my_connection_send_input_event(state_.connection,
@@ -183,7 +183,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                pressed ? 1 : 0,
                                                0);
 
-                ALOGI("Gamepad Y pressed: %d", pressed);
+                ALOGD("Gamepad Y pressed: %d", pressed);
             } break;
             case AKEYCODE_BUTTON_L1: {
                 my_connection_send_input_event(state_.connection,
@@ -191,7 +191,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                pressed ? 1 : 0,
                                                0);
 
-                ALOGI("Gamepad L1 pressed: %d", pressed);
+                ALOGD("Gamepad L1 pressed: %d", pressed);
             } break;
             case AKEYCODE_BUTTON_R1: {
                 my_connection_send_input_event(state_.connection,
@@ -199,7 +199,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                pressed ? 1 : 0,
                                                0);
 
-                ALOGI("Gamepad R1 pressed: %d", pressed);
+                ALOGD("Gamepad R1 pressed: %d", pressed);
             } break;
                 //            case AKEYCODE_BUTTON_L2: {
                 //                my_connection_send_input_event(state_.connection,
@@ -218,7 +218,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                 //                ALOGI("Gamepad R2 pressed: %d", pressed);
                 //            } break;
             case AKEYCODE_DPAD_UP: {
-                ALOGI("Gamepad D-Pad UP pressed: %d", pressed);
+                ALOGD("Gamepad D-Pad UP pressed: %d", pressed);
 
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadUp),
@@ -226,7 +226,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                0);
             } break;
             case AKEYCODE_DPAD_DOWN: {
-                ALOGI("Gamepad D-Pad DOWN pressed: %d", pressed);
+                ALOGD("Gamepad D-Pad DOWN pressed: %d", pressed);
 
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadDown),
@@ -234,7 +234,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                0);
             } break;
             case AKEYCODE_DPAD_LEFT: {
-                ALOGI("Gamepad D-Pad LEFT pressed: %d", pressed);
+                ALOGD("Gamepad D-Pad LEFT pressed: %d", pressed);
 
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadLeft),
@@ -242,7 +242,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                0);
             } break;
             case AKEYCODE_DPAD_RIGHT: {
-                ALOGI("Gamepad D-Pad RIGHT pressed: %d", pressed);
+                ALOGD("Gamepad D-Pad RIGHT pressed: %d", pressed);
 
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadRight),
@@ -250,7 +250,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                0);
             } break;
             case AKEYCODE_BUTTON_START: {
-                ALOGI("Gamepad START pressed: %d", pressed);
+                ALOGD("Gamepad START pressed: %d", pressed);
 
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadButtonStart),
@@ -258,7 +258,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                0);
             } break;
             case AKEYCODE_BUTTON_SELECT: {
-                ALOGI("Gamepad SELECT pressed: %d", pressed);
+                ALOGD("Gamepad SELECT pressed: %d", pressed);
 
                 my_connection_send_input_event(state_.connection,
                                                static_cast<int>(InputType::GamepadButtonSelect),
@@ -266,7 +266,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
                                                0);
             } break;
             default: {
-                ALOGI("Gamepad Unhandled key: %d", key_code);
+                ALOGD("Gamepad Unhandled key: %d", key_code);
                 return 0;
             } break;
         }

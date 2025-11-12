@@ -109,7 +109,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         format!(
             "d3d11convert ! \
         video/x-raw(memory:D3D11Memory),width={},height={},format=NV12,framerate={}/1 ! \
-        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate={} ! ",
+        amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate={} gop-size=30 ! ",
             config.video_width,
             config.video_height,
             config.framerate,
@@ -119,7 +119,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         format!("videoconvert ! \
         videoscale ! \
         video/x-raw,width={},height={},format=NV12,framerate={}/1 ! \
-        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate={} key-int-max=120 ! ",
+        x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate={} key-int-max=30 ! ",
                 config.video_width,
                 config.video_height,
                 config.framerate,

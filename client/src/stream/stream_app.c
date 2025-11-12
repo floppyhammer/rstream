@@ -237,7 +237,7 @@ static GstFlowReturn on_new_sample_cb(GstAppSink *appsink, gpointer user_data) {
 
     // Previous client sample is not used.
     if (prevSample) {
-        ALOGI("Discarding unused, replaced sample");
+        ALOGD("Discarding unused, replaced sample");
         gst_sample_unref(prevSample);
     }
 

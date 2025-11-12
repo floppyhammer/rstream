@@ -57,7 +57,7 @@ class MainMenuActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.i("RStreamClient", "MainMenuActivity: onCreate")
+        Log.d("RStreamClient", "MainMenuActivity: onCreate")
 
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main_menu)
 
@@ -124,14 +124,14 @@ class MainMenuActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.i("RStreamClient", "MainMenuActivity: onResume")
+        Log.d("RStreamClient", "MainMenuActivity: onResume")
         udpListener.startListening()
         handler.post(cleanupRunnable) // Start cleanup task
     }
 
     override fun onPause() {
         super.onPause()
-        Log.i("RStreamClient", "MainMenuActivity: onPause")
+        Log.d("RStreamClient", "MainMenuActivity: onPause")
         udpListener.stopListening()
         handler.removeCallbacks(cleanupRunnable) // Stop cleanup task
 
@@ -143,17 +143,17 @@ class MainMenuActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        Log.i("RStreamClient", "MainMenuActivity: onStart")
+        Log.d("RStreamClient", "MainMenuActivity: onStart")
     }
 
     override fun onStop() {
         super.onStop()
-        Log.i("RStreamClient", "MainMenuActivity: onStop")
+        Log.d("RStreamClient", "MainMenuActivity: onStop")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.i("RStreamClient", "MainMenuActivity: onDestroy")
+        Log.d("RStreamClient", "MainMenuActivity: onDestroy")
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

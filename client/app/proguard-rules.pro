@@ -1,21 +1,35 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# By default, the shrinker retains all classes that are specified as
+# entry points in your app's manifest file. The shrinker also retains
+# any classes that are referenced by those classes, and so on.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# GStreamer JNI / Android Media Classes
+# These classes are accessed by name from native code (JNI) and MUST NOT be obfuscated or removed.
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keep public class org.freedesktop.gstreamer.GStreamer {
+    *;
+}
+-keep public class org.freedesktop.gstreamer.GStreamer$* {
+    *;
+}
+-keep public class org.freedesktop.gstreamer.androidmedia.GstAmc* {
+    *;
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# The specific class mentioned in your error:
+-keep public class org.freedesktop.gstreamer.androidmedia.GstAmcOnFrameAvailableListener {
+    <init>(...);
+    public *;
+}
+
+# If you are using any custom GStreamer Java plugins, you might need to keep them too.
+# Example for a custom element:
+# -keep public class com.yourcompany.gstreamer.MyCustomElement {
+#     *;
+# }
+
+# The following rules are used to strip debug and verbose logs from release builds.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+}
