@@ -22,7 +22,7 @@ class StreamingActivity : NativeActivity() {
         val framerate = intent.getStringExtra("framerate")
         val bitrate = intent.getStringExtra("bitrate")
 
-        Log.d("RStreamClient", "Received Video Quality: $videoQuality, Framerate: $framerate, Bitrate: $bitrate")
+        Log.i("RStreamClient", "Got intent strings: Video Quality: $videoQuality, Framerate: $framerate, Bitrate: $bitrate")
 
 //
 //        // Retrieve the intent extras

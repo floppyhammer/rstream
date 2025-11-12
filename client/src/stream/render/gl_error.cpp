@@ -14,7 +14,7 @@
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
 
-#include "../gst_common.h"
+#include "../sample.h"
 
 bool checkGLError(const char *func, int line) {
     GLenum err = glGetError();

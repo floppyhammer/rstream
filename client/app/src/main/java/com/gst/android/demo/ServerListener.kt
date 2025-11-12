@@ -69,7 +69,7 @@ class UdpListener(
                         val message = String(packet.data, 0, packet.length)
                         val senderIp = packet.address.hostAddress ?: "Unknown"
 
-                        Log.v(TAG, "ServerListener: UDP received packet: $message")
+//                        Log.v(TAG, "ServerListener: UDP received packet: $message")
 
                         // 4. Use withContext(Dispatchers.Main) for UI updates if needed,
                         // or just invoke the callback on the current Coroutine's context (IO)

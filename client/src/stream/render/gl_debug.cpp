@@ -14,7 +14,7 @@
 #include <GLES3/gl32.h>
 #include <android/log.h>
 
-#include "../gst_common.h"
+#include "../sample.h"
 #include "GLES3/gl3.h"
 
 namespace {

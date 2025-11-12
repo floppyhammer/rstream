@@ -16,7 +16,7 @@
 #include <cstdlib>
 #include <stdexcept>
 
-#include "../gst_common.h"
+#include "../sample.h"
 #include "gl_debug.h"
 #include "gl_error.h"
 

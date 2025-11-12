@@ -22,10 +22,10 @@
 
 #include "egl_data.hpp"
 #include "stream/connection.h"
-#include "stream/gst_common.h"
 #include "stream/input.h"
 #include "stream/render/render.hpp"
 #include "stream/render/render_api.h"
+#include "stream/sample.h"
 #include "stream/stream_app.h"
 
 namespace {
@@ -343,7 +343,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
 
         switch (action & AMOTION_EVENT_ACTION_MASK) {
             case AMOTION_EVENT_ACTION_DOWN: {
-                ALOGI("INPUT: DOWN (%.1f, %.1f)", client_x, client_y);
+                ALOGD("INPUT: DOWN (%.1f, %.1f)", client_x, client_y);
                 state_.pressed = true;
                 state_.press_time = g_get_monotonic_time();
                 state_.press_pos_x = client_x;
@@ -362,7 +362,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                     new_client_x = state_.last_cursor_down_pos_x;
                     new_client_y = state_.last_cursor_down_pos_y;
 
-                    ALOGI("INPUT: double click (%.1f, %.1f), interval %.1f", new_client_x, new_client_y, down_interval);
+                    ALOGD("INPUT: double click (%.1f, %.1f), interval %.1f", new_client_x, new_client_y, down_interval);
                 }
 
                 my_connection_send_input_event(state_.connection,
@@ -380,7 +380,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 size_t pointer_index =
                     (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT;
 
-                ALOGI("INPUT: pointer index %zu, action code %d", pointer_index, action_code);
+                ALOGD("INPUT: pointer index %zu, action code %d", pointer_index, action_code);
                 size_t pointer_count = AMotionEvent_getPointerCount(event);
 
                 if (pointer_count > 1) {
@@ -412,7 +412,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                     state_.prev_pos_center_x = x_center;
                     state_.prev_pos_center_y = y_center;
 
-                    ALOGI("INPUT: Multiple touch down %zu", pointer_count);
+                    ALOGD("INPUT: Multiple touch down %zu", pointer_count);
                 }
             } break;
             case AMOTION_EVENT_ACTION_MOVE:
@@ -432,7 +432,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                     if (dx == 0 || dy == 0) {
                         break;
                     }
-                    ALOGI("INPUT: SCROLL (%.1f, %.1f)", dx, dy);
+                    ALOGD("INPUT: SCROLL (%.1f, %.1f)", dx, dy);
                     my_connection_send_input_event(state_.connection,
                                                    static_cast<int>(InputType::CursorScroll),
                                                    dx,
@@ -443,7 +443,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
 
                     state_.scrolling = true;
                 } else {
-                    ALOGI("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
+                    ALOGD("INPUT: MOVE (%.1f, %.1f)", client_x, client_y);
                     my_connection_send_input_event(state_.connection,
                                                    static_cast<int>(InputType::CursorMove),
                                                    client_x,
@@ -457,7 +457,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 state_.prev_pos_y = client_y;
                 break;
             case AMOTION_EVENT_ACTION_UP:
-                ALOGI("INPUT: UP (%.1f, %.1f)", client_x, client_y);
+                ALOGD("INPUT: UP (%.1f, %.1f)", client_x, client_y);
 
                 if (state_.scrolling) {
                     state_.scrolling = false;
@@ -481,7 +481,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                                                client_y);
 
                 if (right_click) {
-                    ALOGI("INPUT: RIGHT CLICK (%.1f, %.1f)", client_x, client_y);
+                    ALOGD("INPUT: RIGHT CLICK (%.1f, %.1f)", client_x, client_y);
                     my_connection_send_input_event(state_.connection,
                                                    static_cast<int>(InputType::CursorRightClick),
                                                    client_x,
@@ -490,7 +490,7 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
                 }
 
                 if (std::abs(state_.press_pos_x - client_x) < 10 && std::abs(state_.press_pos_y - client_y) < 10) {
-                    ALOGI("INPUT: CLICK (%.1f, %.1f)", client_x, client_y);
+                    ALOGD("INPUT: CLICK (%.1f, %.1f)", client_x, client_y);
 
                     my_connection_send_input_event(state_.connection,
                                                    static_cast<int>(InputType::CursorLeftClick),
@@ -513,22 +513,22 @@ int32_t handle_input(struct android_app *app, AInputEvent *event) {
 void onAppCmd(struct android_app *app, int32_t cmd) {
     switch (cmd) {
         case APP_CMD_START:
-            ALOGI("APP_CMD_START");
+            ALOGD("APP_CMD_START");
             break;
         case APP_CMD_RESUME:
-            ALOGI("APP_CMD_RESUME");
+            ALOGD("APP_CMD_RESUME");
             break;
         case APP_CMD_PAUSE:
-            ALOGI("APP_CMD_PAUSE");
+            ALOGD("APP_CMD_PAUSE");
             break;
         case APP_CMD_STOP:
-            ALOGI("APP_CMD_STOP");
+            ALOGD("APP_CMD_STOP");
             break;
         case APP_CMD_DESTROY:
-            ALOGI("APP_CMD_DESTROY");
+            ALOGD("APP_CMD_DESTROY");
             break;
         case APP_CMD_INIT_WINDOW: {
-            ALOGI("APP_CMD_INIT_WINDOW");
+            ALOGD("APP_CMD_INIT_WINDOW");
 
             state_.initialEglData = std::make_unique<EglData>(app->window);
             state_.initialEglData->makeCurrent();
@@ -542,7 +542,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
                             EGL_HEIGHT,
                             &state_.window_height);
 
-            ALOGI("Initialize GStreamer.");
+            ALOGD("Initialize GStreamer.");
             gst_init(NULL, NULL);
 
             // Set up gst logger
@@ -575,11 +575,11 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
             my_connection_connect(state_.connection);
 
-            ALOGI("%s: starting stream client mainloop thread", __FUNCTION__);
+            ALOGD("%s: starting stream client mainloop thread", __FUNCTION__);
             stream_app_spawn_thread(state_.stream_app, state_.connection);
 
             try {
-                ALOGI("%s: Setup renderer...", __FUNCTION__);
+                ALOGD("%s: Setup renderer...", __FUNCTION__);
                 state_.renderer = std::make_unique<Renderer>();
                 state_.renderer->setupRender();
             } catch (std::exception const &e) {
@@ -590,7 +590,7 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
         } break;
         case APP_CMD_TERM_WINDOW: {
-            ALOGI("APP_CMD_TERM_WINDOW");
+            ALOGD("APP_CMD_TERM_WINDOW");
 
             stream_app_stop(state_.stream_app);
 
@@ -598,13 +598,13 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
             my_connection_disconnect(state_.connection);
 
-            ALOGI("Reset renderer and EGL data.");
+            ALOGD("Reset renderer and EGL data.");
             state_.renderer->reset();
             state_.initialEglData.reset();
         } break;
         case APP_CMD_WINDOW_RESIZED:
         case APP_CMD_CONFIG_CHANGED: {
-            ALOGI("APP_CMD_CONFIG_CHANGED");
+            ALOGD("APP_CMD_CONFIG_CHANGED");
             state_.window_width = ANativeWindow_getWidth(app->window);
             state_.window_height = ANativeWindow_getHeight(app->window);
         } break;
@@ -678,7 +678,7 @@ std::string retrieve_data_string(JNIEnv *env, jobject intentObject, jmethodID ge
         env->ReleaseStringUTFChars(nativeDataJString, finalData);
         env->DeleteLocalRef(nativeDataJString);
     } else {
-        ALOGI("Data key not found.");
+        ALOGE("Data key not found.");
     }
 
     // Final clean up
@@ -738,7 +738,7 @@ void android_main(struct android_app *app) {
         env->DeleteLocalRef(intentObject);
     }
 
-    ALOGI("Starting main loop");
+    ALOGD("Starting main loop");
 
     // Main rendering loop.
     while (!app->destroyRequested) {

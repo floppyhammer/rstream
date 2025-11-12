@@ -13,7 +13,7 @@
 #include <gst/video/video-frame.h>
 
 #include "connection.h"
-#include "gst_common.h"
+#include "sample.h"
 
 // clang-format off
 #include <EGL/egl.h>
@@ -504,7 +504,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     GError *error = NULL;
 
     gchar *pipeline_string = g_strdup_printf(
-        "rtpbin name=rtpbin latency=200 "
+        "rtpbin name=rtpbin latency=10 "
         // Video
         "udpsrc name=videoudpsrc port=5601 buffer-size=1000000 "
         "caps=\"application/x-rtp,media=video,payload=96,clock-rate=90000,encoding-name=H264\" ! "
@@ -573,7 +573,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
 
         // (sync=false) Disable audio/video clock sync to reduce latency (we have to do this after setting sink
         // manually)
-        g_object_set(glsinkbin, "sync", FALSE, NULL);
+        g_object_set(glsinkbin, "sync", TRUE, NULL);
     }
 
     {

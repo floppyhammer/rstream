@@ -3,10 +3,13 @@ package com.gst.android.demo
 import android.content.Context
 import android.os.Bundle
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.PopupMenu
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 class SettingsActivity : AppCompatActivity() {
@@ -39,7 +42,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         bitrateOption.setOnClickListener { view ->
-            showBitrateMenu(view)
+            showBitrateSliderDialog(view)
         }
     }
 
@@ -110,37 +113,37 @@ class SettingsActivity : AppCompatActivity() {
         popup.show()
     }
 
-    private fun showBitrateMenu(view: View) {
-        val popup = PopupMenu(this, view, Gravity.END)
-        popup.menuInflater.inflate(R.menu.bitrate_menu, popup.menu)
+    private fun showBitrateSliderDialog(view: View) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_bitrate_slider, null)
+        val bitrateValueText = dialogView.findViewById<TextView>(R.id.bitrate_value_text)
+        val bitrateSeekbar = dialogView.findViewById<SeekBar>(R.id.bitrate_seekbar)
 
         val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedBitrate = sharedPref.getString(BITRATE_KEY, "10")
-        val itemId = when (savedBitrate) {
-            "5" -> R.id.bitrate_5
-            "10" -> R.id.bitrate_10
-            "15" -> R.id.bitrate_15
-            else -> R.id.bitrate_10
-        }
-        popup.menu.findItem(itemId).isChecked = true
+        val savedBitrate = sharedPref.getString(BITRATE_KEY, "10")?.toInt() ?: 10
 
-        popup.setOnMenuItemClickListener { item ->
-            item.isChecked = true
-            val bitrate = when (item.itemId) {
-                R.id.bitrate_5 -> "5"
-                R.id.bitrate_10 -> "10"
-                R.id.bitrate_15 -> "15"
-                else -> "10"
+        bitrateSeekbar.progress = savedBitrate
+        bitrateValueText.text = "$savedBitrate Mbps"
+
+        bitrateSeekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                bitrateValueText.text = "$progress Mbps"
             }
-            val sharedPrefEditor = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-            sharedPrefEditor.putString(BITRATE_KEY, bitrate)
-            sharedPrefEditor.apply()
 
-            updateBitrateLabel()
-            Toast.makeText(this, "Selected bitrate: $bitrate Mbps", Toast.LENGTH_SHORT).show()
-            true
-        }
-        popup.show()
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Bitrate")
+            .setView(dialogView)
+            .setPositiveButton("OK") { _, _ ->
+                val newBitrate = bitrateSeekbar.progress.toString()
+                sharedPref.edit().putString(BITRATE_KEY, newBitrate).apply()
+                updateBitrateLabel()
+                Toast.makeText(this, "Selected bitrate: $newBitrate Mbps", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun updateVideoQualityLabel() {

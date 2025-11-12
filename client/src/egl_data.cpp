@@ -5,8 +5,8 @@
 
 #include <stdexcept>
 
-#include "stream/gst_common.h"
 #include "stream/render/gl_error.h"
+#include "stream/sample.h"
 
 #define MAX_CONFIGS 1024
 

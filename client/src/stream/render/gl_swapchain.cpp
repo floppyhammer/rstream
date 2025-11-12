@@ -15,7 +15,7 @@
 
 #include <cassert>
 
-#include "../gst_common.h"
+#include "../sample.h"
 
 GLSwapchain::~GLSwapchain() {
     reset();
