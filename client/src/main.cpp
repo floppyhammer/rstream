@@ -558,8 +558,16 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             state_.connection = g_object_ref_sink(my_connection_new(websocket_uri.c_str(), state_.host_ip.c_str()));
 
             StreamConfig config{};
-            config.video_width = 1920;
-            config.video_height = 1080;
+            config.video_width = 1280;
+            config.video_height = 720;
+            if (state_.video_quality.find("1080") != std::string::npos) {
+                config.video_width = 1920;
+                config.video_height = 1080;
+            } else if (state_.video_quality.find("1440") != std::string::npos) {
+                config.video_width = 2560;
+                config.video_height = 1440;
+            }
+
             config.framerate = state_.framerate;
             config.bitrate = state_.bitrate;
 

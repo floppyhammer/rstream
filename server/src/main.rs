@@ -9,8 +9,8 @@ mod gui;
 mod input;
 mod stream;
 
+use eframe::egui;
 use eframe::egui::{Style, Visuals};
-use eframe::epaint::image;
 use std::env;
 use std::process::id;
 use std::sync::Mutex;
@@ -48,11 +48,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     app.tray_menu_quit_id = Some(quit_id);
 
+    let icon_image_bytes = include_bytes!("../assets/icon.png");
+    let image = image::load_from_memory(icon_image_bytes)
+        .unwrap()
+        .to_rgba8();
+    let (img_width, img_height) = image.dimensions();
+    let icon_data = egui::IconData {
+        rgba: image.into_raw(),
+        width: img_width,
+        height: img_height,
+    };
+
     let native_options = eframe::NativeOptions {
-        viewport: eframe::egui::ViewportBuilder::default()
-            .with_position([200.0, 200.0])
-            .with_inner_size([480.0, 360.0])
-            .with_drag_and_drop(true),
+        viewport: egui::ViewportBuilder {
+            icon: Some(std::sync::Arc::new(icon_data)),
+            ..Default::default()
+        }
+        .with_position([200.0, 200.0])
+        .with_inner_size([480.0, 360.0])
+        .with_drag_and_drop(true),
         ..Default::default()
     };
 
