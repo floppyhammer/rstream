@@ -26,6 +26,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "gst/rtp/gstrtpbuffer.h"
 #include "thread.h"
 
 struct MySampleImpl {
@@ -493,6 +494,97 @@ static GstPadProbeReturn lost_event_probe(GstPad *pad, GstPadProbeInfo *info, gp
     return GST_PAD_PROBE_PASS;
 }
 
+static GstPadProbeReturn video_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
+    GstBuffer *buf = GST_PAD_PROBE_INFO_BUFFER(info);
+
+    const GstClockTime pts = GST_BUFFER_PTS(buf);
+    const GstClockTime dts = GST_BUFFER_DTS(buf);
+    const GstClockTime duration = GST_BUFFER_DURATION(buf);
+
+    GstRTPBuffer rtp_buffer = {0};
+    guint32 rtp_timestamp = 0;
+
+    if (gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp_buffer)) {
+        rtp_timestamp = gst_rtp_buffer_get_timestamp(&rtp_buffer);
+
+        //		ALOGW("RTP Timestamp: %" GST_TIME_FORMAT, GST_TIME_ARGS(rtp_timestamp));
+
+        gst_rtp_buffer_unmap(&rtp_buffer);
+    }
+
+    static uint16_t prev_seq_num_video = 0;
+
+    GstMapInfo map;
+    if (gst_buffer_map(buf, &map, GST_MAP_READ)) {
+        if (map.size >= 12) {
+            const guint8 *data = map.data;
+            const uint16_t seq_num = (data[2] << 8) | data[3]; // For big-endian systems
+            int32_t seq_num_diff = seq_num - prev_seq_num_video;
+
+            if (seq_num_diff > 1 && !(seq_num == 0 && prev_seq_num_video == 65535)) {
+                ALOGW("Discontinuous video sequence number: PTS: %" GST_TIME_FORMAT
+                      ", RTP PTS: %u, DTS: %" GST_TIME_FORMAT " Duration : %" GST_TIME_FORMAT
+                      ", SeqNum: %u, Previous SeqNum: %u, Lost count: %d",
+                      GST_TIME_ARGS(pts),
+                      rtp_timestamp,
+                      GST_TIME_ARGS(dts),
+                      GST_TIME_ARGS(duration),
+                      seq_num,
+                      prev_seq_num_video,
+                      seq_num_diff - 1);
+            }
+
+            prev_seq_num_video = seq_num;
+        }
+        gst_buffer_unmap(buf, &map);
+    }
+
+    return GST_PAD_PROBE_OK;
+}
+
+static GstPadProbeReturn audio_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
+    GstBuffer *buf = GST_PAD_PROBE_INFO_BUFFER(info);
+
+    const GstClockTime pts = GST_BUFFER_PTS(buf);
+    const GstClockTime dts = GST_BUFFER_DTS(buf);
+    const GstClockTime duration = GST_BUFFER_DURATION(buf);
+
+    GstRTPBuffer rtp_buffer = {0};
+    guint32 rtp_timestamp = 0;
+
+    if (gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp_buffer)) {
+        rtp_timestamp = gst_rtp_buffer_get_timestamp(&rtp_buffer);
+
+        //		ALOGW("RTP Timestamp: %" GST_TIME_FORMAT, GST_TIME_ARGS(rtp_timestamp));
+
+        gst_rtp_buffer_unmap(&rtp_buffer);
+    }
+
+    static uint16_t prev_seq_num_audio = 0;
+
+    GstMapInfo map;
+    if (gst_buffer_map(buf, &map, GST_MAP_READ)) {
+        if (map.size >= 12) {
+            const guint8 *data = map.data;
+            const uint16_t seq_num = (data[2] << 8) | data[3]; // For big-endian systems
+
+            //			if (seq_num - prev_seq_num_audio > 1 || seq_num < prev_seq_num_audio) {
+            //				ALOGW("Audio buffer probe: Discontinuous sequence number!");
+            //			}
+            //
+            //			ALOGV("Audio buffer probe: PTS: %" GST_TIME_FORMAT ", RTP PTS: %u, DTS:
+            //%" GST_TIME_FORMAT 			      " Duration: %" GST_TIME_FORMAT ", Sequence number:
+            //%u", 			      GST_TIME_ARGS(pts), rtp_timestamp, GST_TIME_ARGS(dts),
+            // GST_TIME_ARGS(duration), seq_num);
+
+            prev_seq_num_audio = seq_num;
+        }
+        gst_buffer_unmap(buf, &map);
+    }
+
+    return GST_PAD_PROBE_OK;
+}
+
 static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     ALOGI("%s", __FUNCTION__);
 
@@ -638,6 +730,30 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
             ALOGE("Could not find static sink pad in depay");
         }
     }
+
+    GstElement *video_udpsrc = gst_bin_get_by_name(GST_BIN(app->pipeline), "videoudpsrc");
+    {
+        GstPad *pad = gst_element_get_static_pad(video_udpsrc, "src");
+        if (pad != NULL) {
+            gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, video_rtp_probe, app, NULL);
+            gst_object_unref(pad);
+        } else {
+            ALOGE("Could not find static src pad in video_udpsrc");
+        }
+    }
+    gst_object_unref(video_udpsrc);
+
+    GstElement *audio_udpsrc = gst_bin_get_by_name(GST_BIN(app->pipeline), "audioudpsrc");
+    {
+        GstPad *pad = gst_element_get_static_pad(audio_udpsrc, "src");
+        if (pad != NULL) {
+            gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, audio_rtp_probe, app, NULL);
+            gst_object_unref(pad);
+        } else {
+            ALOGE("Could not find static src pad in audio_udpsrc");
+        }
+    }
+    gst_object_unref(audio_udpsrc);
 
     // This actually hands over the pipeline. Once our own handler returns,
     // the pipeline will be started by the connection.

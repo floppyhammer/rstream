@@ -10,14 +10,8 @@ use eframe::glow::Context;
 use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
-use enigo::Key::C;
 use local_ip_address::list_afinet_netifas;
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
 use tray_icon::menu::{MenuEvent, MenuId};
-use windows::Win32::Foundation::HWND;
-use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
-use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 enum ConnectionStatus {
     Ready,
@@ -160,7 +154,6 @@ impl eframe::App for App {
         let Self {
             option1_enabled,
             option2_enabled,
-            terminal_output,
             connection_status,
             ..
         } = self;
