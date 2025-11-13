@@ -49,5 +49,12 @@
                 android:value="rstream_client" />
 
         </activity>
+
+        <activity
+            android:name=".ConnectActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
+        </activity>
+
     </application>
 </manifest>

@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.databinding.DataBindingUtil
@@ -16,8 +15,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.gst.android.demo.databinding.ActivityMainMenuBinding
 
 class MainMenuActivity : AppCompatActivity() {
-    private lateinit var editText: EditText
-    private val PREFS_NAME = "MyPrefsFile"
     private val HOST_IP_KEY = "host_ip"
     private lateinit var binding: ActivityMainMenuBinding
 
@@ -63,9 +60,8 @@ class MainMenuActivity : AppCompatActivity() {
 
         setupRecyclerView()
 
-        binding.connectButton.setOnClickListener {
-            val intent = Intent(this, StreamingActivity::class.java)
-            intent.putExtra(HOST_IP_KEY, editText.text.toString())
+        binding.manualConnectButton.setOnClickListener {
+            val intent = Intent(this, ConnectActivity::class.java)
             startActivity(intent)
         }
 
@@ -73,12 +69,6 @@ class MainMenuActivity : AppCompatActivity() {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }
-
-        editText = findViewById(R.id.editTextText)
-
-        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val savedText = sharedPref.getString(HOST_IP_KEY, "")
-        editText.setText(savedText)
 
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
@@ -134,11 +124,6 @@ class MainMenuActivity : AppCompatActivity() {
         Log.d("RStreamClient", "MainMenuActivity: onPause")
         udpListener.stopListening()
         handler.removeCallbacks(cleanupRunnable) // Stop cleanup task
-
-        val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        sharedPref.edit {
-            putString(HOST_IP_KEY, editText.text.toString())
-        }
     }
 
     override fun onStart() {
