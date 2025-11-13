@@ -10,5 +10,8 @@
         <item
             android:id="@+id/quality_1440p"
             android:title="1440P" />
+        <item
+            android:id="@+id/quality_4k"
+            android:title="4K" />
     </group>
 </menu>

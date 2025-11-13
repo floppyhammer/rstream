@@ -56,6 +56,7 @@ class SettingsActivity : AppCompatActivity() {
             "720p" -> R.id.quality_720p
             "1080p" -> R.id.quality_1080p
             "1440p" -> R.id.quality_1440p
+            "4k" -> R.id.quality_4k
             else -> R.id.quality_1080p
         }
         popup.menu.findItem(itemId).isChecked = true
@@ -66,6 +67,7 @@ class SettingsActivity : AppCompatActivity() {
                 R.id.quality_720p -> "720p"
                 R.id.quality_1080p -> "1080p"
                 R.id.quality_1440p -> "1440p"
+                R.id.quality_4k -> "4k"
                 else -> "1080p"
             }
 
@@ -87,6 +89,7 @@ class SettingsActivity : AppCompatActivity() {
         val sharedPref = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedFramerate = sharedPref.getString(FRAMERATE_KEY, "60")
         val itemId = when (savedFramerate) {
+            "15" -> R.id.framerate_15
             "30" -> R.id.framerate_30
             "60" -> R.id.framerate_60
             "90" -> R.id.framerate_90
@@ -97,6 +100,7 @@ class SettingsActivity : AppCompatActivity() {
         popup.setOnMenuItemClickListener { item ->
             item.isChecked = true
             val framerate = when (item.itemId) {
+                R.id.framerate_15 -> "15"
                 R.id.framerate_30 -> "30"
                 R.id.framerate_60 -> "60"
                 R.id.framerate_90 -> "90"

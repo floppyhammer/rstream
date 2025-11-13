@@ -91,7 +91,7 @@ int32_t handle_gamepad_key_event(const AInputEvent *event) {
     int32_t action = AKeyEvent_getAction(event);
     int32_t key_code = AKeyEvent_getKeyCode(event);
 
-//    ALOGI("Gamepad source %d, action %d, key code %d", source, action, key_code);
+    //    ALOGI("Gamepad source %d, action %d, key code %d", source, action, key_code);
 
     if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION) {
         if (source & AINPUT_SOURCE_JOYSTICK) {
@@ -560,12 +560,15 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             StreamConfig config{};
             config.video_width = 1280;
             config.video_height = 720;
-            if (state_.video_quality.find("1080") != std::string::npos) {
+            if (state_.video_quality.find("1080p") != std::string::npos) {
                 config.video_width = 1920;
                 config.video_height = 1080;
-            } else if (state_.video_quality.find("1440") != std::string::npos) {
+            } else if (state_.video_quality.find("1440p") != std::string::npos) {
                 config.video_width = 2560;
                 config.video_height = 1440;
+            } else if (state_.video_quality.find("4k") != std::string::npos) {
+                config.video_width = 3840;
+                config.video_height = 2160;
             }
 
             config.framerate = state_.framerate;

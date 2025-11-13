@@ -2,6 +2,9 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <group android:checkableBehavior="single">
         <item
+            android:id="@+id/framerate_15"
+            android:title="15 FPS" />
+        <item
             android:id="@+id/framerate_30"
             android:title="30 FPS" />
         <item
