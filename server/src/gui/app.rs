@@ -1,5 +1,5 @@
 use crate::discovery::run_announcer;
-use crate::gui::config::{Config, PeerManagementType};
+use crate::gui::config::{Config};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
 use crate::VISIBLE;
@@ -15,12 +15,6 @@ use tray_icon::menu::{MenuEvent, MenuId};
 
 pub struct App {
     config: Config,
-
-    // Extra options.
-    option1_enabled: bool,
-    option2_enabled: bool,
-
-    terminal_output: String,
 
     pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
@@ -71,11 +65,6 @@ impl Default for App {
 
         Self {
             config,
-
-            option1_enabled: false,
-            option2_enabled: false,
-
-            terminal_output: String::new(),
 
             tray_menu_quit_id: None,
         }
@@ -141,12 +130,6 @@ impl eframe::App for App {
                 &_ => {}
             }
         }
-
-        let Self {
-            option1_enabled,
-            option2_enabled,
-            ..
-        } = self;
 
         if self.config.dark_mode {
             ctx.set_visuals(Visuals::dark());

@@ -13,8 +13,6 @@ const ANNOUNCE_INTERVAL_SECONDS: u64 = 2;
 
 pub(crate) async fn run_announcer(local_ip: String) -> Result<(), IoError> {
     task::spawn_blocking(move || -> io::Result<()> {
-        println!("Local IP address: {}", local_ip);
-
         // 1. Create a UDP socket and bind it to a local address (0.0.0.0 for all interfaces)
         // We bind to 0.0.0.0 and port 0, letting the OS choose a free port.
         let socket = UdpSocket::bind(format!("{}:0", local_ip))?;
@@ -28,16 +26,14 @@ pub(crate) async fn run_announcer(local_ip: String) -> Result<(), IoError> {
         let hostname = gethostname::gethostname();
         let message = format!("{}:5600", hostname.to_str().unwrap());
 
-        println!("Game Stream Server Announcer Started.");
         println!(
-            "Sending: '{}' every {} seconds to {}:{}",
-            message, ANNOUNCE_INTERVAL_SECONDS, BROADCAST_ADDRESS, BROADCAST_PORT
+            "Broadcasting '{}' every {} seconds from {} to {}:{}",
+            message, ANNOUNCE_INTERVAL_SECONDS, local_ip, BROADCAST_ADDRESS, BROADCAST_PORT
         );
 
         let message_bytes = message.as_bytes();
 
         loop {
-            // 3. Send the broadcast packet
             match socket.send_to(message_bytes, broadcast_target) {
                 Ok(_bytes_sent) => {
                     let _now_utc = Utc::now();
@@ -48,7 +44,7 @@ pub(crate) async fn run_announcer(local_ip: String) -> Result<(), IoError> {
                 }
             }
 
-            // Wait before sending the next announcement
+            // Wait before sending the next announcement.
             thread::sleep(Duration::from_secs(ANNOUNCE_INTERVAL_SECONDS));
         }
     })

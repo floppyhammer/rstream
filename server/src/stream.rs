@@ -326,7 +326,7 @@ pub async fn run_websocket(port: u32) -> Result<(), IoError> {
 
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
-    println!("Listening on: {}", addr);
+    println!("WebSocket listening on: {}", addr);
 
     while let Ok((stream, addr)) = listener.accept().await {
         task::spawn(handle_connection(
