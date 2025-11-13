@@ -478,7 +478,7 @@ static GstPadProbeReturn lost_event_probe(GstPad *pad, GstPadProbeInfo *info, gp
                 // Parse the specific fields of the event structure
                 if (gst_structure_get_uint(structure, "seqnum", &seqnum) &&
                     gst_structure_get_uint64(structure, "timestamp", &timestamp)) {
-                    ALOGI("Video packet lost! SeqNum: %u, Timestamp: %lu (%" GST_TIME_FORMAT ")",
+                    ALOGI("[jitterbuffer] Video packet lost! SeqNum: %u, RTP Time: %lu (%" GST_TIME_FORMAT ")",
                           seqnum,
                           timestamp,
                           GST_TIME_ARGS(timestamp));
@@ -501,8 +501,11 @@ static GstPadProbeReturn video_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpo
     const GstClockTime dts = GST_BUFFER_DTS(buf);
     const GstClockTime duration = GST_BUFFER_DURATION(buf);
 
+    static bool first_time = true;
+
     GstRTPBuffer rtp_buffer = {0};
     guint32 rtp_timestamp = 0;
+    static guint32 rtp_timestamp_start = 0;
 
     if (gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp_buffer)) {
         rtp_timestamp = gst_rtp_buffer_get_timestamp(&rtp_buffer);
@@ -514,6 +517,13 @@ static GstPadProbeReturn video_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpo
 
     static uint16_t prev_seq_num_video = 0;
 
+    if (first_time) {
+        rtp_timestamp_start = rtp_timestamp;
+    }
+
+    gint32 rtp_timestamp_diff = (gint32)(rtp_timestamp - rtp_timestamp_start);
+    gfloat time_in_seconds = (gfloat)rtp_timestamp_diff / 90000;
+
     GstMapInfo map;
     if (gst_buffer_map(buf, &map, GST_MAP_READ)) {
         if (map.size >= 12) {
@@ -521,12 +531,13 @@ static GstPadProbeReturn video_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpo
             const uint16_t seq_num = (data[2] << 8) | data[3]; // For big-endian systems
             int32_t seq_num_diff = seq_num - prev_seq_num_video;
 
-            if (seq_num_diff > 1 && !(seq_num == 0 && prev_seq_num_video == 65535)) {
-                ALOGW("Discontinuous video sequence number: PTS: %" GST_TIME_FORMAT
-                      ", RTP PTS: %u, DTS: %" GST_TIME_FORMAT " Duration : %" GST_TIME_FORMAT
-                      ", SeqNum: %u, Previous SeqNum: %u, Lost count: %d",
+            if (seq_num_diff > 1 && !(seq_num == 0 && prev_seq_num_video == 65535) && !first_time) {
+                ALOGW("[udpsrc] Discontinuous video sequence number: PTS: %" GST_TIME_FORMAT
+                      ", RTP Timestamp: %u, RTP Time: %.4f, DTS: %" GST_TIME_FORMAT " Duration : %" GST_TIME_FORMAT
+                      ", SeqNum: %u, Previous SeqNum: %u, Lost Count: %d",
                       GST_TIME_ARGS(pts),
                       rtp_timestamp,
+                      time_in_seconds,
                       GST_TIME_ARGS(dts),
                       GST_TIME_ARGS(duration),
                       seq_num,
@@ -538,6 +549,8 @@ static GstPadProbeReturn video_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpo
         }
         gst_buffer_unmap(buf, &map);
     }
+
+    first_time = false;
 
     return GST_PAD_PROBE_OK;
 }
@@ -634,7 +647,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     GError *error = NULL;
 
     gchar *pipeline_string = g_strdup_printf(
-        "rtpbin name=rtpbin latency=10 do-lost=true "
+        "rtpbin name=rtpbin latency=50 do-lost=true "
         // Video
         "udpsrc name=videoudpsrc port=5601 buffer-size=1000000 "
         "caps=\"application/x-rtp,media=video,payload=96,clock-rate=90000,encoding-name=H264\" ! "
