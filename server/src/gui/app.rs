@@ -1,23 +1,17 @@
 use crate::discovery::run_announcer;
 use crate::gui::config::{Config, PeerManagementType};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
-use crate::stream::{run_websocket, StreamingState, STREAMING_STATE_GUARD};
+use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
 use crate::VISIBLE;
 use async_std::task;
 use eframe::egui;
-use eframe::egui::{CollapsingHeader, ViewportCommand, Visuals};
+use eframe::egui::{CollapsingHeader, RichText, ViewportCommand, Visuals};
 use eframe::glow::Context;
 use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
 use local_ip_address::list_afinet_netifas;
 use tray_icon::menu::{MenuEvent, MenuId};
-
-enum ConnectionStatus {
-    Ready,
-    Connected,
-    Error,
-}
 
 pub struct App {
     config: Config,
@@ -27,8 +21,6 @@ pub struct App {
     option2_enabled: bool,
 
     terminal_output: String,
-
-    connection_status: ConnectionStatus,
 
     pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
@@ -52,6 +44,7 @@ impl Default for App {
                 dpi_scale: 1.0,
                 native_resolution: (1920, 1080),
                 stream_config: None,
+                connection_status: ConnectionStatus::Ready,
             };
             *guard = Some(streaming_state);
         }
@@ -83,8 +76,6 @@ impl Default for App {
             option2_enabled: false,
 
             terminal_output: String::new(),
-
-            connection_status: ConnectionStatus::Ready,
 
             tray_menu_quit_id: None,
         }
@@ -154,7 +145,6 @@ impl eframe::App for App {
         let Self {
             option1_enabled,
             option2_enabled,
-            connection_status,
             ..
         } = self;
 
@@ -179,6 +169,33 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ScrollArea::vertical().show_viewport(ui, |ui, _| {
+                let mut connection_status = ConnectionStatus::Error;
+                {
+                    let guard = STREAMING_STATE_GUARD.lock().unwrap();
+                    if let Some(state) = guard.as_ref() {
+                        connection_status = state.connection_status;
+                    }
+                }
+
+                let styled_label;
+                match connection_status {
+                    ConnectionStatus::Ready => {
+                        let label_text = RichText::new("READY");
+                        styled_label = label_text.color(Color32::YELLOW);
+                    }
+                    ConnectionStatus::Connected => {
+                        let label_text = RichText::new("CONNECTED");
+                        styled_label = label_text.color(Color32::GREEN);
+                    }
+                    ConnectionStatus::Error => {
+                        let label_text = RichText::new("ERROR");
+                        styled_label = label_text.color(Color32::RED);
+                    }
+                }
+
+                let styled_label = styled_label.size(24.0).strong();
+                ui.label(styled_label);
+
                 ui.horizontal(|ui| {
                     ui.label("PIN");
 
@@ -208,24 +225,45 @@ impl eframe::App for App {
                         self.config.pin = crate::gui::config::generate_pin(4);
                     }
 
-                    match connection_status {
-                        ConnectionStatus::Ready => {
-                            ui.colored_label(Color32::YELLOW, "READY");
-                        }
-                        ConnectionStatus::Connected => {
-                            ui.colored_label(Color32::GREEN, "CONNECTED");
-                        }
-                        ConnectionStatus::Error => {
-                            ui.colored_label(Color32::RED, "ERROR");
-                        }
-                    }
-
                     if ui.ui_contains_pointer() {
                         egui::show_tooltip(ui.ctx(), egui::Id::new("pin_tooltip"), |ui| {
                             ui.label("Enter this when connecting from client side.");
                         });
                     }
                 });
+                //
+                // ui.add_space(8.0);
+                //
+                // CollapsingHeader::new("Peer management type")
+                //     .default_open(true)
+                //     .show(ui, |ui| {
+                //         ui.radio_value(
+                //             &mut self.config.peer_management_type,
+                //             PeerManagementType::SinglePeer,
+                //             PeerManagementType::SinglePeer.to_string(),
+                //         );
+                //         ui.radio_value(
+                //             &mut self.config.peer_management_type,
+                //             PeerManagementType::MultiplePeersSingleControl,
+                //             PeerManagementType::MultiplePeersSingleControl.to_string(),
+                //         );
+                //         ui.radio_value(
+                //             &mut self.config.peer_management_type,
+                //             PeerManagementType::MultiplePeersMultipleControl,
+                //             PeerManagementType::MultiplePeersMultipleControl.to_string(),
+                //         );
+                //
+                //         // Add tooltip.
+                //         if ui.ui_contains_pointer() {
+                //             egui::show_tooltip(
+                //                 ui.ctx(),
+                //                 egui::Id::new("peer_management_tooltip"),
+                //                 |ui| {
+                //                     ui.label("Manage peers");
+                //                 },
+                //             );
+                //         }
+                //     });
 
                 ui.add_space(8.0);
 
@@ -243,7 +281,7 @@ impl eframe::App for App {
                                     ui.label(format!("Framerate (Hz): {}", config.framerate));
                                     ui.label(format!("Bitrate (Mbps): {}", config.bitrate));
                                 } else {
-                                    ui.label("Disconnected");
+                                    ui.label("Not Available");
                                 }
                             }
                         });
@@ -251,47 +289,14 @@ impl eframe::App for App {
 
                 ui.add_space(8.0);
 
-                CollapsingHeader::new("Peer management type")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        ui.radio_value(
-                            &mut self.config.peer_management_type,
-                            PeerManagementType::SinglePeer,
-                            PeerManagementType::SinglePeer.to_string(),
-                        );
-                        ui.radio_value(
-                            &mut self.config.peer_management_type,
-                            PeerManagementType::MultiplePeersSingleControl,
-                            PeerManagementType::MultiplePeersSingleControl.to_string(),
-                        );
-                        ui.radio_value(
-                            &mut self.config.peer_management_type,
-                            PeerManagementType::MultiplePeersMultipleControl,
-                            PeerManagementType::MultiplePeersMultipleControl.to_string(),
-                        );
-
-                        // Add tooltip.
-                        if ui.ui_contains_pointer() {
-                            egui::show_tooltip(
-                                ui.ctx(),
-                                egui::Id::new("peer_management_tooltip"),
-                                |ui| {
-                                    ui.label("Manage peers");
-                                },
-                            );
-                        }
-                    });
-
-                ui.add_space(8.0);
-
-                CollapsingHeader::new("Host settings")
-                    .default_open(true)
-                    .show(ui, |ui| {
-                        ui.checkbox(option1_enabled, "option1");
-                        ui.checkbox(option2_enabled, "option2");
-                    });
-
-                ui.add_space(8.0);
+                // CollapsingHeader::new("Host settings")
+                //     .default_open(true)
+                //     .show(ui, |ui| {
+                //         ui.checkbox(option1_enabled, "option1");
+                //         ui.checkbox(option2_enabled, "option2");
+                //     });
+                //
+                // ui.add_space(8.0);
 
                 CollapsingHeader::new("Connected Peers")
                     .default_open(true)
@@ -299,6 +304,10 @@ impl eframe::App for App {
                         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
 
                         if let Some(state) = guard.as_mut() {
+                            if state.peers.is_empty() {
+                                ui.label("None");
+                            }
+
                             for p in &state.peers {
                                 ui.horizontal(|ui| {
                                     ui.label(format!("(1) IP: {}", p.1.ip));

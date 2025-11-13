@@ -4,8 +4,6 @@ use std::io::prelude::*;
 
 const CONFIG_FILE: &str = "config.json";
 
-const DEFAULT_BITRATE: u32 = 8;
-
 use rand::Rng;
 
 pub(crate) fn generate_pin(length: usize) -> String {
@@ -60,7 +58,6 @@ impl PeerManagementType {
 }
 
 pub struct Config {
-    pub bitrate: u32,
     pub peer_management_type: PeerManagementType,
     pub pin: String,
     pub dark_mode: bool,
@@ -72,7 +69,6 @@ impl Config {
         let pin = generate_pin(4);
 
         Self {
-            bitrate: DEFAULT_BITRATE,
             peer_management_type,
             pin,
             dark_mode: true,
@@ -99,9 +95,6 @@ impl Config {
         self.peer_management_type = PeerManagementType::from_u32(
             json_value["peer_management_type"].as_u64().unwrap_or(0) as u32,
         );
-        self.bitrate = json_value["bitrate"]
-            .as_u64()
-            .unwrap_or(DEFAULT_BITRATE as u64) as u32;
         self.pin = String::from(json_value["pin"].as_str().unwrap_or(""));
         self.dark_mode = json_value["dark_mode"].as_bool().unwrap_or(true);
 
@@ -110,7 +103,6 @@ impl Config {
 
     pub fn write(&mut self) -> std::io::Result<()> {
         let json_value = json!({
-            "bitrate": self.bitrate,
             "peer_management_type": self.peer_management_type.to_u32(),
             "dark_mode": self.dark_mode,
             "pin": self.pin,

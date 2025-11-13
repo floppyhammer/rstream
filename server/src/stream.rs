@@ -46,6 +46,7 @@ pub struct StreamingState {
     pub(crate) dpi_scale: f32,
     pub(crate) native_resolution: (u32, u32),
     pub(crate) stream_config: Option<StreamConfig>,
+    pub(crate) connection_status: ConnectionStatus,
 }
 
 pub static STREAMING_STATE_GUARD: Mutex<Option<StreamingState>> = Mutex::new(None);
@@ -53,6 +54,13 @@ pub static STREAMING_STATE_GUARD: Mutex<Option<StreamingState>> = Mutex::new(Non
 // ----------------------------------------------------------------------
 // --- GStreamer Functions (Now Thread-Safe) ----------------------------
 // ----------------------------------------------------------------------
+
+#[derive(Copy, Clone)]
+pub(crate) enum ConnectionStatus {
+    Ready,
+    Connected,
+    Error,
+}
 
 fn init_gstreamer() {
     // This function will initialize GStreamer only once.
@@ -294,6 +302,8 @@ async fn handle_connection(
         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
         if let Some(state) = guard.as_mut() {
             state.peers.remove(&addr);
+            state.stream_config = None;
+            state.connection_status = ConnectionStatus::Ready;
         }
     }
 
@@ -368,6 +378,7 @@ fn handle_text_message(msg: Message, addr: SocketAddr) {
                     };
 
                     state.stream_config = Some(config);
+                    state.connection_status = ConnectionStatus::Connected;
                 }
             }
 
