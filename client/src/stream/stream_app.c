@@ -48,7 +48,7 @@ struct _MyStreamApp {
     GstGLDisplay *display;
 
     /// Wrapped version of the android_main/render context
-    GstGLContext *android_main_context;
+    GstGLContext *gst_gl_wrapped_context;
 
     /// GStreamer-created EGL context for its own use
     GstGLContext *context;
@@ -62,7 +62,7 @@ struct _MyStreamApp {
 
     struct {
         EGLDisplay display;
-        EGLContext android_main_context;
+        EGLContext context;
         EGLSurface surface;
     } egl;
 
@@ -139,15 +139,17 @@ void stream_app_set_egl_context(MyStreamApp *app, EGLContext context, EGLDisplay
     ALOGI("Wrapping egl context");
 
     app->egl.display = display;
-    app->egl.android_main_context = context;
+    app->egl.context = context;
     app->egl.surface = surface;
 
-    const GstGLPlatform egl_platform = GST_GL_PLATFORM_EGL;
-    guintptr android_main_egl_context_handle = gst_gl_context_get_current_gl_context(egl_platform);
-    GstGLAPI gl_api = gst_gl_context_get_current_gl_api(egl_platform, NULL, NULL);
+    if (eglMakeCurrent(display, surface, surface, context) == EGL_FALSE) {
+        ALOGE("%s: Failed make egl context current", __FUNCTION__);
+    }
+
+    GstGLAPI gl_api = gst_gl_context_get_current_gl_api(GST_GL_PLATFORM_EGL, NULL, NULL);
     app->gst_gl_display = g_object_ref_sink(gst_gl_display_new());
-    app->android_main_context = g_object_ref_sink(
-        gst_gl_context_new_wrapped(app->gst_gl_display, android_main_egl_context_handle, egl_platform, gl_api));
+    app->gst_gl_wrapped_context = g_object_ref_sink(
+        gst_gl_context_new_wrapped(app->gst_gl_display, (guintptr)context, GST_GL_PLATFORM_EGL, gl_api));
 }
 
 /*
@@ -172,7 +174,7 @@ static GstBusSyncReply bus_sync_handler_cb(GstBus *bus, GstMessage *msg, MyStrea
             ALOGI("Got message: Need app context");
             g_autoptr(GstContext) app_context = gst_context_new("gst.gl.app_context", TRUE);
             GstStructure *s = gst_context_writable_structure(app_context);
-            gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, app->android_main_context, NULL);
+            gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, app->gst_gl_wrapped_context, NULL);
             gst_element_set_context(GST_ELEMENT(msg->src), app_context);
         }
     }
