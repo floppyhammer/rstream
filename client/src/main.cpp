@@ -743,6 +743,8 @@ void android_main(struct android_app *app) {
 
     ALOGD("Starting main loop");
 
+    bool notified = false;
+
     // Main rendering loop.
     while (!app->destroyRequested) {
         if (!poll_events(app)) {
@@ -756,7 +758,11 @@ void android_main(struct android_app *app) {
         // Exit the native activity upon connection loss.
         if (my_connection_server_closed(state_.connection)) {
             ALOGI("Server closed, exiting.");
-            ANativeActivity_finish(app->activity);
+            if (!notified) {
+                ANativeActivity_finish(app->activity);
+                notified = true;
+            }
+            continue;
         }
 
         state_.initialEglData->makeCurrent();

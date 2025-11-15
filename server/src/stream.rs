@@ -124,6 +124,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     } else {
         format!("videoconvert ! \
         videoscale ! \
+        videorate ! \
         video/x-raw,width={},height={},format=NV12,framerate={}/1 ! \
         x264enc name=enc tune=zerolatency sliced-threads=true speed-preset=ultrafast bframes=0 bitrate={} key-int-max=30 ! ",
                 config.video_width,
@@ -147,7 +148,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         queue ! \
         audioconvert ! \
         audioresample ! \
-        opusenc perfect-timestamp=false audio-type=restricted-lowdelay bitrate-type=cbr ! \
+        opusenc perfect-timestamp=true audio-type=restricted-lowdelay bitrate-type=cbr frame-size=10 ! \
         rtpopuspay ! \
         application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
         rtp.send_rtp_sink_1 \
@@ -156,7 +157,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         encoder_str, host, host
     );
 
-    println!("Attempting to start pipeline to: {}...", addr);
+    println!("Attempting to parse pipeline: \n{}", pipeline_str);
 
     let mut context = gst::ParseContext::new();
 
