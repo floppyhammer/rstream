@@ -114,6 +114,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
 
         format!(
             "d3d11convert ! \
+        videorate ! \
         video/x-raw(memory:D3D11Memory),width={},height={},format=NV12,framerate={}/1 ! \
         amfh264enc name=enc preset=speed usage=ultra-low-latency rate-control=cbr bitrate={} gop-size=30 ! ",
             config.video_width,
