@@ -794,7 +794,7 @@ void android_main(struct android_app *app) {
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         glViewport(state_.h_margin, state_.v_margin, state_.render_width, state_.render_height);

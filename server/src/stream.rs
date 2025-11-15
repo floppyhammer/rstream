@@ -134,14 +134,14 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     };
 
     let pipeline_str = format!(
-        "rtpbin name=rtpbin \
+        "rtpbin name=rtp \
         d3d11screencapturesrc show-cursor=true ! \
         {}\
         video/x-h264,profile=baseline ! \
         rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
-        rtpbin.send_rtp_sink_0 \
-        rtpbin. ! \
+        rtp.send_rtp_sink_0 \
+        rtp. ! \
         udpsink name=videoudpsrc host={} port=5601 sync=false \
         wasapi2src loopback=true low-latency=true ! \
         queue ! \
@@ -150,8 +150,8 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         opusenc perfect-timestamp=false audio-type=restricted-lowdelay bitrate-type=cbr ! \
         rtpopuspay ! \
         application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
-        rtpbin.send_rtp_sink_1 \
-        rtpbin. ! \
+        rtp.send_rtp_sink_1 \
+        rtp. ! \
         udpsink host={} port=5602 sync=false",
         encoder_str, host, host
     );

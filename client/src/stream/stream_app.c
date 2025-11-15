@@ -509,9 +509,6 @@ static GstPadProbeReturn video_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpo
 
     if (gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp_buffer)) {
         rtp_timestamp = gst_rtp_buffer_get_timestamp(&rtp_buffer);
-
-        //		ALOGW("RTP Timestamp: %" GST_TIME_FORMAT, GST_TIME_ARGS(rtp_timestamp));
-
         gst_rtp_buffer_unmap(&rtp_buffer);
     }
 
@@ -562,38 +559,53 @@ static GstPadProbeReturn audio_rtp_probe(GstPad *pad, GstPadProbeInfo *info, gpo
     const GstClockTime dts = GST_BUFFER_DTS(buf);
     const GstClockTime duration = GST_BUFFER_DURATION(buf);
 
+    static bool first_time = true;
+
     GstRTPBuffer rtp_buffer = {0};
     guint32 rtp_timestamp = 0;
+    static guint32 rtp_timestamp_start = 0;
 
     if (gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp_buffer)) {
         rtp_timestamp = gst_rtp_buffer_get_timestamp(&rtp_buffer);
-
-        //		ALOGW("RTP Timestamp: %" GST_TIME_FORMAT, GST_TIME_ARGS(rtp_timestamp));
-
         gst_rtp_buffer_unmap(&rtp_buffer);
     }
 
-    static uint16_t prev_seq_num_audio = 0;
+    static uint16_t prev_seq_num_video = 0;
+
+    if (first_time) {
+        rtp_timestamp_start = rtp_timestamp;
+    }
+
+    gint32 rtp_timestamp_diff = (gint32)(rtp_timestamp - rtp_timestamp_start);
+    gfloat time_in_seconds = (gfloat)rtp_timestamp_diff / 48000;
 
     GstMapInfo map;
     if (gst_buffer_map(buf, &map, GST_MAP_READ)) {
         if (map.size >= 12) {
             const guint8 *data = map.data;
             const uint16_t seq_num = (data[2] << 8) | data[3]; // For big-endian systems
+            int32_t seq_num_diff = seq_num - prev_seq_num_video;
 
-            //			if (seq_num - prev_seq_num_audio > 1 || seq_num < prev_seq_num_audio) {
-            //				ALOGW("Audio buffer probe: Discontinuous sequence number!");
-            //			}
-            //
-            //			ALOGV("Audio buffer probe: PTS: %" GST_TIME_FORMAT ", RTP PTS: %u, DTS:
-            //%" GST_TIME_FORMAT 			      " Duration: %" GST_TIME_FORMAT ", Sequence number:
-            //%u", 			      GST_TIME_ARGS(pts), rtp_timestamp, GST_TIME_ARGS(dts),
-            // GST_TIME_ARGS(duration), seq_num);
+            if (seq_num_diff > 1 && !(seq_num == 0 && prev_seq_num_video == 65535) && !first_time) {
+                ALOGW("[udpsrc] Discontinuous audio sequence number: PTS: %" GST_TIME_FORMAT
+                      ", RTP Timestamp: %u, RTP Time: %.4f, DTS: %" GST_TIME_FORMAT " Duration : %" GST_TIME_FORMAT
+                      ", SeqNum: %u, Previous SeqNum: %u, Lost Count: %d",
+                      GST_TIME_ARGS(pts),
+                      rtp_timestamp,
+                      time_in_seconds,
+                      GST_TIME_ARGS(dts),
+                      GST_TIME_ARGS(duration),
+                      seq_num,
+                      prev_seq_num_video,
+                      seq_num_diff - 1);
+            }
 
-            prev_seq_num_audio = seq_num;
+            prev_seq_num_video = seq_num;
         }
         gst_buffer_unmap(buf, &map);
     }
+
+    first_time = false;
 
     return GST_PAD_PROBE_OK;
 }
@@ -647,23 +659,24 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
     GError *error = NULL;
 
     gchar *pipeline_string = g_strdup_printf(
-        "rtpbin name=rtpbin latency=50 do-lost=true "
+        "rtpbin name=rtp latency=10 do-lost=true "
         // Video
         "udpsrc name=videoudpsrc port=5601 buffer-size=1000000 "
         "caps=\"application/x-rtp,media=video,payload=96,clock-rate=90000,encoding-name=H264\" ! "
-        "rtpbin.recv_rtp_sink_0 "
-        "rtpbin. ! "
+        "rtp.recv_rtp_sink_0 "
+        "rtp. ! "
         "rtph264depay name=depay ! "
         "decodebin3 ! "
         "glsinkbin name=glsink "
         // Audio
         "udpsrc name=audioudpsrc port=5602 "
         "caps=\"application/x-rtp,media=audio,payload=127,clock-rate=48000,encoding-name=OPUS\" ! "
-        "rtpbin.recv_rtp_sink_1 "
-        "rtpbin. ! "
+        "rtp.recv_rtp_sink_1 "
+        "rtp. ! "
         "rtpopusdepay name=audiodepay ! "
         "opusdec ! "
-        "openslessink name=audiosink sync=true provide-clock=false buffer-time=20000 latency-time=20000 ");
+        // Set sync=false to fix audio stutter caused by video packet loss (due to A/V sync)
+        "openslessink name=audiosink sync=true provide-clock=true buffer-time=20000 latency-time=20000 ");
 
     app->pipeline = gst_object_ref_sink(gst_parse_launch(pipeline_string, &error));
     if (app->pipeline == NULL) {
@@ -716,7 +729,7 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
 
         // (sync=false) Disable audio/video clock sync to reduce latency (we have to do this after setting sink
         // manually)
-        g_object_set(glsinkbin, "sync", TRUE, NULL);
+        g_object_set(glsinkbin, "sync", FALSE, NULL);
     }
 
     {
