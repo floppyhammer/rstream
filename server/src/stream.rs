@@ -10,6 +10,8 @@ use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
     future, pin_mut,
 };
+use gstreamer::glib::ControlFlow;
+use gstreamer::MessageView;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -199,6 +201,51 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     // Check pipeline
     // let dot_data = pipeline.debug_to_dot_data(gst::DebugGraphDetails::ALL);
     // let _dot_str = dot_data.as_str();
+
+    let bus = pipeline.bus().unwrap();
+
+    let _bus_watch_id = bus.add_watch(move |_, msg| {
+        match msg.view() {
+            MessageView::Error(err) => {
+                eprintln!(
+                    "Error from {:?}: {} ({:?})",
+                    err.src().map(|s| s.path_string()),
+                    err.error(),
+                    err.debug()
+                );
+                // An error occurred, you might want to quit the application here
+                // Returning `glib::Continue(false)` stops the watch.
+                // In a real app, you'd send an event to the main thread to handle shutdown.
+                // For simplicity here, we'll just log and continue.
+            }
+            MessageView::Warning(warning) => {
+                eprintln!(
+                    "Warning from {:?}: {} ({:?})",
+                    warning.src().map(|s| s.path_string()),
+                    warning.error(),
+                    warning.debug()
+                );
+            }
+            MessageView::Eos(_) => {
+                println!("End of stream reached.");
+                // End of stream, you might want to quit the application here
+                // Returning `glib::Continue(false)` stops the watch.
+            }
+            MessageView::StateChanged(state_changed) => {
+                println!(
+                    "Pipeline state changed from {:?} to {:?} (pending: {:?})",
+                    state_changed.old(),
+                    state_changed.current(),
+                    state_changed.pending(),
+                );
+            }
+            // Add more match arms for other message types you care about
+            _ => {
+                println!("Unhandled message: {:?}", msg.type_()); // Uncomment for all messages
+            }
+        }
+        ControlFlow::Continue
+    });
 
     // Store the running pipeline in the global Mutex
     *guard = Some(pipeline.clone());
