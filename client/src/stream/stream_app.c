@@ -658,8 +658,8 @@ static void on_need_pipeline_cb(MyConnection *my_conn, MyStreamApp *app) {
         "rtp. ! "
         "rtpopusdepay name=audiodepay ! "
         "opusdec ! "
-        // Set sync=false to fix audio stutter caused by video packet loss (due to A/V sync)
-        "openslessink name=audiosink sync=false provide-clock=true buffer-time=20000 latency-time=20000 ");
+        // Set sync=false for correct A/V sync
+        "openslessink name=audiosink sync=true provide-clock=true buffer-time=20000 latency-time=20000 ");
 
     app->pipeline = gst_object_ref_sink(gst_parse_launch(pipeline_string, &error));
     if (app->pipeline == NULL) {

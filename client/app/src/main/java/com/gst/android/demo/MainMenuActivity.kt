@@ -15,7 +15,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.gst.android.demo.databinding.ActivityMainMenuBinding
 
 class MainMenuActivity : AppCompatActivity() {
-    private val HOST_IP_KEY = "host_ip"
     private lateinit var binding: ActivityMainMenuBinding
 
     private val UDP_PORT = 55555 // The port to listen on
@@ -96,7 +95,7 @@ class MainMenuActivity : AppCompatActivity() {
             val bitrate = sharedPref.getString("bitrate", "10")
 
             val intent = Intent(this@MainMenuActivity, StreamingActivity::class.java)
-            intent.putExtra(HOST_IP_KEY, host.ipAddress)
+            intent.putExtra("host_ip", host.ipAddress)
             intent.putExtra("video_quality", videoQuality)
             intent.putExtra("framerate", framerate)
             intent.putExtra("bitrate", bitrate)
