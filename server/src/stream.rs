@@ -143,17 +143,18 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         rtph264pay config-interval=-1 aggregate-mode=zero-latency ! \
         application/x-rtp,encoding-name=H264,clock-rate=90000,media=video,payload=96 ! \
         rtp.send_rtp_sink_0 \
-        rtp. ! \
+        rtp.send_rtp_src_0 ! \
         udpsink name=videoudpsrc host={} port=5601 sync=false \
         wasapi2src loopback=true low-latency=true ! \
         queue ! \
         audioconvert ! \
         audioresample ! \
+        audio/x-raw,rate=48000 ! \
         opusenc perfect-timestamp=true audio-type=restricted-lowdelay bitrate-type=cbr frame-size=10 ! \
         rtpopuspay ! \
         application/x-rtp,encoding-name=OPUS,media=audio,payload=127 !
         rtp.send_rtp_sink_1 \
-        rtp. ! \
+        rtp.send_rtp_src_1 ! \
         udpsink host={} port=5602 sync=false",
         encoder_str, host, host
     );
