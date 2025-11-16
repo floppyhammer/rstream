@@ -2,7 +2,6 @@ use crate::discovery::run_announcer;
 use crate::gui::config::{Config};
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
-use crate::VISIBLE;
 use async_std::task;
 use eframe::egui;
 use eframe::egui::{CollapsingHeader, RichText, ViewportCommand, Visuals};
@@ -90,16 +89,16 @@ impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let close_requested = ctx.input(|i| i.viewport().close_requested());
-        if close_requested {
-            let mut visible = VISIBLE.lock().unwrap();
-
-            if *visible {
-                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
-                *visible = false;
-            }
-        }
+        // let close_requested = ctx.input(|i| i.viewport().close_requested());
+        // if close_requested {
+        //     let mut visible = VISIBLE.lock().unwrap();
+        //
+        //     if *visible {
+        //         ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        //         ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+        //         *visible = false;
+        //     }
+        // }
 
         {
             let scale_factor = get_scale_factor(ctx);
