@@ -293,11 +293,13 @@ impl eframe::App for App {
 
                             for p in &state.peers {
                                 ui.horizontal(|ui| {
-                                    ui.label(format!("(1) IP: {}", p.1.ip));
-                                    ui.label(format!("Time connected: {}", p.1.time_connected));
                                     if ui.button("Disconnect").clicked() {
                                         println!("Disconnect");
                                     };
+                                    ui.label(format!(
+                                        "(1) {} connected at: {}",
+                                        p.1.ip, p.1.time_connected
+                                    ));
                                 });
                             }
                         }

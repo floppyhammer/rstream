@@ -4,7 +4,7 @@ use gstreamer as gst;
 use async_std::net::{TcpListener, TcpStream};
 use async_std::task;
 use async_tungstenite::tungstenite::protocol::Message;
-use chrono::Utc;
+use chrono::{SubsecRound, Utc};
 use futures::prelude::*;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
@@ -295,7 +295,7 @@ async fn handle_connection(
 
     {
         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
-        let date_as_string = Utc::now().to_string();
+        let date_as_string = Utc::now().trunc_subsecs(0).to_string();
         if let Some(state) = guard.as_mut() {
             state.peers.insert(
                 addr,
