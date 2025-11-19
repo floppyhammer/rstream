@@ -743,7 +743,7 @@ void android_main(struct android_app *app) {
 
     ALOGD("Starting main loop");
 
-    bool notified = false;
+    bool server_close_notified = false;
 
     // Main rendering loop.
     while (!app->destroyRequested) {
@@ -757,17 +757,17 @@ void android_main(struct android_app *app) {
 
         // Exit the native activity upon connection loss.
         if (my_connection_server_closed(state_.connection)) {
-            ALOGI("Server closed, exiting.");
-            if (!notified) {
+            if (!server_close_notified) {
+                ALOGI("Server closed, call ANativeActivity_finish.");
                 ANativeActivity_finish(app->activity);
-                notified = true;
+                server_close_notified = true;
             }
             continue;
         }
 
         state_.initialEglData->makeCurrent();
 
-        struct timespec decodeEndTime;
+        struct timespec decodeEndTime{};
         struct MySample *sample = stream_app_try_pull_sample(state_.stream_app, &decodeEndTime);
 
         uint32_t video_width = stream_app_get_video_width(state_.stream_app);

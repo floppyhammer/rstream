@@ -286,6 +286,12 @@ async fn handle_connection(
 ) {
     println!("Incoming TCP connection from: {}", addr);
 
+    let ws_stream = async_tungstenite::accept_async(raw_stream)
+        .await
+        .expect("Error during the websocket handshake occurred");
+
+    println!("WebSocket connection established: {}", addr);
+
     {
         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
         let date_as_string = Utc::now().to_string();
@@ -300,17 +306,11 @@ async fn handle_connection(
         }
     }
 
-    let ws_stream = async_tungstenite::accept_async(raw_stream)
-        .await
-        .expect("Error during the websocket handshake occurred");
-    println!("WebSocket connection established: {}", addr);
-
-    // --- LOGIC: Start Pipeline on First Connection ---
-    let start_pipe = move || {
+    // Initialize gstreamer.
+    let init_gst = move || {
         init_gstreamer();
     };
-    start_once.call_once(start_pipe);
-    // ---------------------------------------------------
+    start_once.call_once(init_gst);
 
     // Insert the write part of this peer to the peer map.
     let (tx, rx) = unbounded();
@@ -345,7 +345,7 @@ async fn handle_connection(
     pin_mut!(broadcast_incoming, receive_from_others);
     future::select(broadcast_incoming, receive_from_others).await;
 
-    println!("{} disconnected", &addr);
+    println!("WebSocket {} disconnected", &addr);
     peer_map.lock().unwrap().remove(&addr);
 
     {
@@ -361,10 +361,6 @@ async fn handle_connection(
     if peer_map.lock().unwrap().is_empty() {
         // Spawn a task to run the blocking pipeline stop function
         task::spawn_blocking(stop_gstreamer_pipeline);
-        // Reset the Once flag so the stream can be started again next time
-        // NOTE: This is a complex step in real apps. The current GstPipelineControl
-        // will prevent future restarts. For this example, we'll accept the limitation
-        // that the process must restart to stream to a *new* first client.
     }
 }
 
