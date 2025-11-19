@@ -27,6 +27,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 static VISIBLE: Mutex<bool> = Mutex::new(true);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+
     let asset_dir = std::path::Path::new(env!("OUT_DIR")).join("assets");
     let icon = Icon::from_path(asset_dir.join("favicon.ico"), None)?;
 

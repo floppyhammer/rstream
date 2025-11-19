@@ -5,6 +5,7 @@ use std::io::Error as IoError;
 use std::net::{Ipv4Addr, UdpSocket};
 use std::thread;
 use std::time::Duration;
+use log::info;
 
 const BROADCAST_PORT: u16 = 55555;
 // Standard broadcast address for the local network.
@@ -26,7 +27,7 @@ pub(crate) async fn run_announcer(local_ip: String) -> Result<(), IoError> {
         let hostname = gethostname::gethostname();
         let message = format!("{}:5600", hostname.to_str().unwrap());
 
-        println!(
+        info!(
             "Broadcasting '{}' every {} seconds from {} to {}:{}",
             message, ANNOUNCE_INTERVAL_SECONDS, local_ip, BROADCAST_ADDRESS, BROADCAST_PORT
         );

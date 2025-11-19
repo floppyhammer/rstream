@@ -1,5 +1,5 @@
 use crate::discovery::run_announcer;
-use crate::gui::config::{Config};
+use crate::gui::config::Config;
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
@@ -10,6 +10,7 @@ use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
 use local_ip_address::list_afinet_netifas;
+use log::info;
 use tray_icon::menu::{MenuEvent, MenuId};
 
 pub struct App {
@@ -23,10 +24,10 @@ impl Default for App {
         let mut config = Config::new();
         match config.read() {
             Ok(_) => {
-                println!("Loaded config file.")
+                info!("Loaded config file.")
             }
             Err(_) => {
-                println!("No config file found, created a new one.")
+                info!("No config file found, created a new one.")
             }
         }
 
@@ -123,7 +124,7 @@ impl eframe::App for App {
             // event.id() returns a reference (&MenuId), so we compare it to a reference
             match event.id() {
                 id if id == self.tray_menu_quit_id.as_ref().unwrap() => {
-                    println!("Tray Menu Event: Quit selected. Shutting down.");
+                    info!("Tray Menu Event: Quit selected. Shutting down.");
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 &_ => {}
@@ -325,7 +326,7 @@ impl eframe::App for App {
             .write()
             .expect("Failed to write the config file!");
 
-        println!("Saved config file.");
+        info!("Saved config file.");
 
         // // Block the main thread to keep the async runtime and the WS server alive.
         // if let (Err(e0), Err(e1)) = task::block_on(future::join(ws_handle, enet_handle)) {

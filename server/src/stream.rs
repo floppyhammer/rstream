@@ -12,6 +12,7 @@ use futures::{
 };
 use gstreamer::glib::ControlFlow;
 use gstreamer::MessageView;
+use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -68,7 +69,7 @@ fn init_gstreamer() {
     // This function will initialize GStreamer only once.
     PIPELINE_INIT.call_once(|| {
         gst::init().unwrap();
-        println!("GStreamer initialized.");
+        info!("GStreamer initialized.");
         gst::log::set_default_threshold(gst::DebugLevel::Warning);
     });
 }
@@ -103,7 +104,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
 
     // Check if a pipeline is already running
     if guard.is_some() {
-        println!("Pipeline already running. Not restarting.");
+        warn!("Pipeline already running. Not restarting.");
         return;
     }
 
@@ -112,7 +113,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     let found_amf = check_factory_exists("amfh264enc");
 
     let encoder_str = if found_amf {
-        println!("amfh264enc is available.");
+        info!("amfh264enc is available.");
 
         format!(
             "d3d11convert ! \
@@ -161,7 +162,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         encoder_str, host, host
     );
 
-    println!("Attempting to parse pipeline: \n{}", pipeline_str);
+    info!("Attempting to parse pipeline: \n{}", pipeline_str);
 
     let mut context = gst::ParseContext::new();
 
@@ -173,9 +174,9 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
         Ok(pipeline) => pipeline,
         Err(err) => {
             if let Some(gst::ParseError::NoSuchElement) = err.kind::<gst::ParseError>() {
-                eprintln!("Missing element(s): {:?}", context.missing_elements());
+                error!("Missing element(s): {:?}", context.missing_elements());
             } else {
-                eprintln!("Failed to parse pipeline: {err}");
+                error!("Failed to parse pipeline: {err}");
             }
             return;
         }
@@ -207,7 +208,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
     let _bus_watch_id = bus.add_watch(move |_, msg| {
         match msg.view() {
             MessageView::Error(err) => {
-                eprintln!(
+                error!(
                     "Error from {:?}: {} ({:?})",
                     err.src().map(|s| s.path_string()),
                     err.error(),
@@ -219,7 +220,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
                 // For simplicity here, we'll just log and continue.
             }
             MessageView::Warning(warning) => {
-                eprintln!(
+                error!(
                     "Warning from {:?}: {} ({:?})",
                     warning.src().map(|s| s.path_string()),
                     warning.error(),
@@ -227,12 +228,12 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
                 );
             }
             MessageView::Eos(_) => {
-                println!("End of stream reached.");
+                error!("End of stream reached.");
                 // End of stream, you might want to quit the application here
                 // Returning `glib::Continue(false)` stops the watch.
             }
             MessageView::StateChanged(state_changed) => {
-                println!(
+                error!(
                     "Pipeline state changed from {:?} to {:?} (pending: {:?})",
                     state_changed.old(),
                     state_changed.current(),
@@ -241,7 +242,7 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
             }
             // Add more match arms for other message types you care about
             _ => {
-                println!("Unhandled message: {:?}", msg.type_()); // Uncomment for all messages
+                error!("Unhandled message: {:?}", msg.type_()); // Uncomment for all messages
             }
         }
         ControlFlow::Continue
@@ -252,9 +253,9 @@ fn start_gstreamer_pipeline(addr: SocketAddr, config: StreamConfigMessage) {
 
     // Set pipeline to playing
     if let Err(e) = pipeline.set_state(gst::State::Playing) {
-        eprintln!("Failed to set pipeline to Playing: {}", e);
+        error!("Failed to set pipeline to Playing: {}", e);
     } else {
-        println!("Pipeline started playing to {}!", addr);
+        info!("Pipeline started playing to {}!", addr);
     }
 }
 
@@ -265,11 +266,11 @@ pub fn stop_gstreamer_pipeline() {
     // Use `Option::take()` to extract the pipeline and replace the value with None.
     // The extracted pipeline reference will then be dropped when it goes out of scope.
     if let Some(pipeline) = guard.take() {
-        println!("Stopping pipeline.");
+        error!("Stopping pipeline.");
         pipeline
             .set_state(gst::State::Null)
             .expect("Unable to set the pipeline to the `Null` state");
-        println!("Pipeline stopped.");
+        error!("Pipeline stopped.");
     }
     // The lock is automatically released when `guard` goes out of scope.
 }
@@ -284,13 +285,13 @@ async fn handle_connection(
     addr: SocketAddr,
     start_once: GstPipelineControl,
 ) {
-    println!("Incoming TCP connection from: {}", addr);
+    info!("Incoming TCP connection from: {}", addr);
 
     let ws_stream = async_tungstenite::accept_async(raw_stream)
         .await
         .expect("Error during the websocket handshake occurred");
 
-    println!("WebSocket connection established: {}", addr);
+    info!("WebSocket connection established: {}", addr);
 
     {
         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
@@ -345,7 +346,7 @@ async fn handle_connection(
     pin_mut!(broadcast_incoming, receive_from_others);
     future::select(broadcast_incoming, receive_from_others).await;
 
-    println!("WebSocket {} disconnected", &addr);
+    info!("WebSocket {} disconnected", &addr);
     peer_map.lock().unwrap().remove(&addr);
 
     {
@@ -372,7 +373,7 @@ pub async fn run_websocket(port: u32) -> Result<(), IoError> {
 
     let try_socket = TcpListener::bind(&addr).await;
     let listener = try_socket.expect("Failed to bind");
-    println!("WebSocket listening on: {}", addr);
+    info!("WebSocket listening on: {}", addr);
 
     while let Ok((stream, addr)) = listener.accept().await {
         task::spawn(handle_connection(
@@ -405,14 +406,8 @@ fn handle_text_message(msg: Message, addr: SocketAddr) {
 
     match serde_json::from_str::<StreamConfigMessage>(&text) {
         Ok(config_msg) => {
-            println!("✅ Config received successfully:");
-            println!("  Type: {}", config_msg.msg_type);
-            println!(
-                "  Video Size: {}x{}",
-                config_msg.video_width, config_msg.video_height
-            );
-            println!("  Bitrate: {}", config_msg.bitrate);
-            println!("  PIN: {}", config_msg.pin);
+            info!("✅ Config received successfully:\n\tType: {}\n\tVideo Size: {}x{}\n\tBitrate: {}\n\tPIN: {}",
+                config_msg.msg_type, config_msg.video_width, config_msg.video_height, config_msg.bitrate, config_msg.pin);
 
             {
                 let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
@@ -434,8 +429,10 @@ fn handle_text_message(msg: Message, addr: SocketAddr) {
             });
         }
         Err(e) => {
-            eprintln!("❌ ERROR: Failed to deserialize JSON: {}", e);
-            eprintln!("   Payload was: {}", text);
+            error!(
+                "❌ ERROR: Failed to deserialize JSON: {}\n\tPayload was: {}",
+                e, text
+            );
         }
     }
 }

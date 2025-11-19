@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 use std::fs::File;
 use std::io::prelude::*;
+use log::debug;
 
 const CONFIG_FILE: &str = "config.json";
 
@@ -87,7 +88,7 @@ impl Config {
         // Beautify json string.
         let json_string = serde_json::to_string_pretty(&json_value).unwrap();
 
-        println!(
+        debug!(
             "======== Config ========\n{}\n========================",
             json_string,
         );

@@ -31,7 +31,7 @@ pub fn init_enigo() {
     ENIGO_INIT.call_once(|| {
         let enigo = Enigo::new(&Settings::default()).expect("Failed to initialize Enigo");
         *ENIGO_GUARD.lock().unwrap() = Some(enigo);
-        println!("Enigo initialized.");
+        log::info!("Enigo initialized.");
     });
 }
 
@@ -40,18 +40,18 @@ pub fn init_vigem() {
     VIGEM_INIT.call_once(|| {
         // 1. Connect to the ViGEmBus driver service
         let client = vigem::Client::connect().unwrap();
-        println!("Vigem initialized.");
+        log::info!("Vigem initialized.");
 
         // 2. Create the virtual controller target (Xbox 360 Wired)
         let id = TargetId::XBOX360_WIRED;
         let mut target = vigem::Xbox360Wired::new(client, id);
 
         // 3. Plug in the virtual controller
-        println!("Plugging in virtual Xbox 360 controller...");
+        log::info!("Plugging in virtual Xbox 360 controller...");
         target.plugin().unwrap();
 
         // 4. Wait for the virtual controller to be ready to accept updates
-        println!("Waiting for controller to be ready...");
+        log::info!("Waiting for controller to be ready...");
         target.wait_ready().unwrap();
 
         *VIGEM_GUARD.lock().unwrap() = Some(target);
@@ -61,7 +61,7 @@ pub fn init_vigem() {
         };
         *GAMEPAD_GUARD.lock().unwrap() = Some(gamepad);
 
-        println!("Controller is ready.");
+        log::info!("Controller is ready.");
     });
 }
 
@@ -91,16 +91,24 @@ pub async fn run_enet_server() -> Result<(), IoError> {
         let mut host = start_enet_server();
         let mut received_events = false;
 
-        println!("Starting ENet loop.");
+        log::info!("Starting ENet loop.");
 
         loop {
             while let Some(event) = host.service().unwrap() {
                 match event {
                     enet::Event::Connect { peer, .. } => {
-                        println!("ENet peer {} connected", peer.id().0);
+                        log::info!(
+                            "ENet peer ({}) {} connected.",
+                            peer.id().0,
+                            peer.address().unwrap()
+                        );
                     }
                     enet::Event::Disconnect { peer, .. } => {
-                        println!("ENet peer {} disconnected", peer.id().0);
+                        log::info!(
+                            "ENet peer ({}) {} disconnected.",
+                            peer.id().0,
+                            peer.address().unwrap()
+                        );
                     }
                     enet::Event::Receive {
                         peer: _,
@@ -290,14 +298,14 @@ fn handle_enet_packet(packet: &enet::Packet) {
                 .move_mouse(x_coord as i32, y_coord as i32, Abs)
                 .unwrap();
             enigo.button(Button::Left, Press).unwrap();
-            println!("CursorLeftDown pos {},{}", x_coord as i32, y_coord as i32);
+            log::debug!("CursorLeftDown pos {},{}", x_coord as i32, y_coord as i32);
         }
         InputType::CursorLeftUp => {
             enigo
                 .move_mouse(x_coord as i32, y_coord as i32, Abs)
                 .unwrap();
             enigo.button(Button::Left, Release).unwrap();
-            println!("CursorLeftUp pos {},{}", x_coord as i32, y_coord as i32);
+            log::debug!("CursorLeftUp pos {},{}", x_coord as i32, y_coord as i32);
         }
         InputType::CursorMove => {
             enigo
@@ -309,13 +317,13 @@ fn handle_enet_packet(packet: &enet::Packet) {
                 enigo
                     .scroll((-x * 0.2) as i32, enigo::Axis::Horizontal)
                     .unwrap();
-                println!("Cursor scroll delta X {}", x);
+                log::debug!("Cursor scroll delta X {}", x);
             }
             if y.abs() > 0.1 {
                 enigo
                     .scroll((-y * 0.2) as i32, enigo::Axis::Vertical)
                     .unwrap();
-                println!("Cursor scroll delta Y {}", y);
+                log::debug!("Cursor scroll delta Y {}", y);
             }
         }
         InputType::CursorLeftClick => {
@@ -329,94 +337,94 @@ fn handle_enet_packet(packet: &enet::Packet) {
                 .move_mouse(x_coord as i32, y_coord as i32, Abs)
                 .unwrap();
             enigo.button(Button::Right, Click).unwrap();
-            println!("CursorRightClick pos {},{}", x_coord as i32, y_coord as i32);
+            log::debug!("CursorRightClick pos {},{}", x_coord as i32, y_coord as i32);
         }
         InputType::GamepadButtonX => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::X);
 
-            println!("Gamepad button X {}", pressed);
+            log::debug!("Gamepad button X {}", pressed);
         }
         InputType::GamepadButtonY => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::Y);
-            println!("Gamepad button Y {}", pressed);
+            log::debug!("Gamepad button Y {}", pressed);
         }
         InputType::GamepadButtonA => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::A);
-            println!("Gamepad button A {}", pressed);
+            log::debug!("Gamepad button A {}", pressed);
         }
         InputType::GamepadButtonB => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::B);
-            println!("Gamepad button B {}", pressed);
+            log::debug!("Gamepad button B {}", pressed);
         }
         InputType::GamepadButtonL1 => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::LB);
-            println!("Gamepad button LB {}", pressed);
+            log::debug!("Gamepad button LB {}", pressed);
         }
         InputType::GamepadButtonR1 => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::RB);
-            println!("Gamepad button RB {}", pressed);
+            log::debug!("Gamepad button RB {}", pressed);
         }
         InputType::GamepadButtonL2 => {
-            println!("Gamepad button LT {}", x);
+            log::debug!("Gamepad button LT {}", x);
 
             gamepad.left_trigger = (x * 256.0) as u8;
         }
         InputType::GamepadButtonR2 => {
-            println!("Gamepad button RT {}", x);
+            log::debug!("Gamepad button RT {}", x);
 
             gamepad.right_trigger = (x * 256.0) as u8;
         }
         InputType::GamepadButtonStart => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::START);
-            println!("Gamepad button START {}", pressed);
+            log::debug!("Gamepad button START {}", pressed);
         }
         InputType::GamepadButtonSelect => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::BACK);
-            println!("Gamepad button SELECT {}", pressed);
+            log::debug!("Gamepad button SELECT {}", pressed);
         }
         InputType::GamepadButtonUp => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::UP);
-            println!("Gamepad button UP {}", pressed);
+            log::debug!("Gamepad button UP {}", pressed);
         }
         InputType::GamepadButtonDown => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::DOWN);
-            println!("Gamepad button DOWN {}", pressed);
+            log::debug!("Gamepad button DOWN {}", pressed);
         }
         InputType::GamepadButtonLeft => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::LEFT);
-            println!("Gamepad button LEFT {}", pressed);
+            log::debug!("Gamepad button LEFT {}", pressed);
         }
         InputType::GamepadButtonRight => {
             pressed = x > 0.0;
             button_to_set = Some(vigem_client::XButtons::RIGHT);
-            println!("Gamepad button RIGHT {}", pressed);
+            log::debug!("Gamepad button RIGHT {}", pressed);
         }
         InputType::GamepadLeftStick => {
-            println!("Gamepad Left Stick ({}, {})", x, y);
+            log::debug!("Gamepad Left Stick ({}, {})", x, y);
 
             gamepad.thumb_lx = (x * 32767.0) as i16;
             gamepad.thumb_ly = (y * -32767.0) as i16;
         }
         InputType::GamepadRightStick => {
-            println!("Gamepad Right Stick ({}, {})", x, y);
+            log::debug!("Gamepad Right Stick ({}, {})", x, y);
 
             gamepad.thumb_rx = (x * 32767.0) as i16;
             gamepad.thumb_ry = (y * -32767.0) as i16;
         }
         InputType::KeyboardSuper => {
             pressed = x > 0.0;
-            println!("Keyboard SUPER {}", pressed);
+            log::debug!("Keyboard SUPER {}", pressed);
 
             enigo.key(Key::Meta, Direction::Click).unwrap();
         }
