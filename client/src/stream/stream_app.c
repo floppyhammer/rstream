@@ -352,10 +352,10 @@ void stream_app_stop(MyStreamApp *app) {
 
     gst_clear_object(&app->context);
 
-    // Quit gstreamer thread.
     {
         g_main_loop_quit(app->loop);
         os_thread_helper_stop(&app->play_thread);
+        ALOGI("Quited gstreamer thread.");
     }
 
     g_clear_object(&app->loop);

@@ -143,7 +143,7 @@ void Renderer::setupQuadVertexData() {
 }
 
 Renderer::~Renderer() {
-    reset();
+    destroy();
 }
 
 void Renderer::setupRender() {
@@ -152,7 +152,7 @@ void Renderer::setupRender() {
     setupQuadVertexData();
 }
 
-void Renderer::reset() {
+void Renderer::destroy() {
     if (program != 0) {
         glDeleteProgram(program);
         program = 0;

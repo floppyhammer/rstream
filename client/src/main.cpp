@@ -64,12 +64,6 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
             eglQuerySurface(state_.egl_data->display, state_.egl_data->surface, EGL_WIDTH, &state_.window_width);
             eglQuerySurface(state_.egl_data->display, state_.egl_data->surface, EGL_HEIGHT, &state_.window_height);
 
-            ALOGD("Initialize GStreamer.");
-            gst_init(NULL, NULL);
-
-            // Set up gst logger
-            gst_debug_set_default_threshold(GST_LEVEL_WARNING);
-
             state_.stream_app = my_stream_app_new();
             stream_app_set_egl_context(state_.stream_app,
                                        state_.egl_data->context,
@@ -109,10 +103,9 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
                 state_.renderer->setupRender();
             } catch (std::exception const &e) {
                 ALOGE("%s: Caught exception setting up renderer: %s", __FUNCTION__, e.what());
-                state_.renderer->reset();
+                state_.renderer.reset();
                 abort();
             }
-
         } break;
         case APP_CMD_TERM_WINDOW: {
             ALOGD("APP_CMD_TERM_WINDOW");
@@ -123,8 +116,10 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
             my_connection_disconnect(state_.connection);
 
+            g_clear_object(&state_.connection);
+
             ALOGD("Reset renderer and EGL data.");
-            state_.renderer->reset();
+            state_.renderer.reset();
             state_.egl_data.reset();
         } break;
         case APP_CMD_WINDOW_RESIZED:
@@ -255,6 +250,12 @@ void android_main(struct android_app *app) {
         env->DeleteLocalRef(intentClass);
         env->DeleteLocalRef(intentObject);
     }
+
+    ALOGD("Initialize GStreamer.");
+    gst_init(NULL, NULL);
+
+    // Set up gst logger
+    gst_debug_set_default_threshold(GST_LEVEL_WARNING);
 
     ALOGD("Starting main loop");
 

@@ -30,7 +30,7 @@ public:
     void setupRender();
 
     /// Destroy resources. Must call with EGL context current.
-    void reset();
+    void destroy();
 
     /// Draw texture to framebuffer. Must call with EGL Context current.
     void draw(GLuint texture, GLenum texture_target) const;
