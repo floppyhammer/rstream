@@ -266,11 +266,10 @@ pub fn stop_gstreamer_pipeline() {
     // Use `Option::take()` to extract the pipeline and replace the value with None.
     // The extracted pipeline reference will then be dropped when it goes out of scope.
     if let Some(pipeline) = guard.take() {
-        error!("Stopping pipeline.");
         pipeline
             .set_state(gst::State::Null)
             .expect("Unable to set the pipeline to the `Null` state");
-        error!("Pipeline stopped.");
+        info!("Pipeline stopped.");
     }
     // The lock is automatically released when `guard` goes out of scope.
 }

@@ -14,7 +14,7 @@ target_include_directories(native_app_glue PUBLIC ${ANDROID_NDK}/sources/android
 # now build app's shared lib
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Werror")
 
-add_library(rstream_client SHARED main.cpp egl_data.cpp)
+add_library(rstream_client SHARED main.cpp egl_data.cpp input.cpp)
 
 target_include_directories(
         rstream_client PRIVATE
