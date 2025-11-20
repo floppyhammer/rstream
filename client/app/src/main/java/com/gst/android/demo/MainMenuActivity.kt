@@ -8,6 +8,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.LayoutInflater
+import android.widget.EditText
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import androidx.databinding.DataBindingUtil
@@ -27,6 +31,8 @@ class MainMenuActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val cleanupInterval = 2000L // 2 seconds
     private val hostTimeout = 5000L // 10 seconds
+
+    private val PIN_PREFS_NAME = "PinPrefs"
 
     private val cleanupRunnable = object : Runnable {
         override fun run() {
@@ -88,27 +94,95 @@ class MainMenuActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        hostAdapter = HostAdapter(hostList) { host ->
-            val sharedPref = getSharedPreferences("SettingsPrefs", Context.MODE_PRIVATE)
-            val videoQuality = sharedPref.getString("video_quality", "1080p")
-            val framerate = sharedPref.getString("framerate", "60")
-            val bitrate = sharedPref.getString("bitrate", "10")
+        hostAdapter = HostAdapter(hostList, onItemClick = { host ->
+            val pinPrefs = getSharedPreferences(PIN_PREFS_NAME, Context.MODE_PRIVATE)
+            val savedPin = pinPrefs.getString("pin_${host.ipAddress}", null)
 
-            val intent = Intent(this@MainMenuActivity, StreamingActivity::class.java)
-            intent.putExtra("host_ip", host.ipAddress)
-            intent.putExtra("video_quality", videoQuality)
-            intent.putExtra("framerate", framerate)
-            intent.putExtra("bitrate", bitrate)
-
-            Log.i(
-                "RStreamClient",
-                "Starting stream for ${host.ipAddress} with quality: $videoQuality, framerate: $framerate, bitrate: $bitrate"
-            )
-
-            startActivity(intent)
-        }
+            if (savedPin != null) {
+                startStreaming(host, savedPin)
+            } else {
+                showPinDialog(host)
+            }
+        }, onItemLongClick = { host ->
+            showClearPinDialog(host)
+        })
         binding.hostsRecyclerView.adapter = hostAdapter
         binding.hostsRecyclerView.layoutManager = LinearLayoutManager(this)
+    }
+
+    private fun showClearPinDialog(host: Host) {
+        val pinPrefs = getSharedPreferences(PIN_PREFS_NAME, Context.MODE_PRIVATE)
+        val savedPin = pinPrefs.getString("pin_${host.ipAddress}", null)
+
+        val message = if (savedPin != null) {
+            "Do you want to clear the saved PIN ($savedPin) for ${host.name}?"
+        } else {
+            "No PIN is saved for ${host.name}."
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Clear PIN")
+            .setMessage(message)
+            .setPositiveButton("Clear") { dialog, _ ->
+                if (savedPin != null) {
+                    pinPrefs.edit {
+                        remove("pin_${host.ipAddress}")
+                    }
+                    Toast.makeText(this, "PIN cleared for ${host.name}", Toast.LENGTH_SHORT).show()
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.cancel()
+            }
+            .create()
+            .show()
+    }
+
+    private fun showPinDialog(host: Host) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_pin, null)
+        val pinEditText = dialogView.findViewById<EditText>(R.id.pin_edit_text)
+
+        AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setTitle("Set PIN for ${host.name}")
+            .setPositiveButton("Connect") { dialog, _ ->
+                val pin = pinEditText.text.toString()
+                if (pin.isNotEmpty()) {
+                    val pinPrefs = getSharedPreferences(PIN_PREFS_NAME, Context.MODE_PRIVATE)
+                    pinPrefs.edit {
+                        putString("pin_${host.ipAddress}", pin)
+                    }
+                    startStreaming(host, pin)
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.cancel()
+            }
+            .create()
+            .show()
+    }
+
+    private fun startStreaming(host: Host, pin: String) {
+        val sharedPref = getSharedPreferences("SettingsPrefs", Context.MODE_PRIVATE)
+        val videoQuality = sharedPref.getString("video_quality", "1080p")
+        val framerate = sharedPref.getString("framerate", "60")
+        val bitrate = sharedPref.getString("bitrate", "10")
+
+        val intent = Intent(this@MainMenuActivity, StreamingActivity::class.java)
+        intent.putExtra("host_ip", host.ipAddress)
+        intent.putExtra("video_quality", videoQuality)
+        intent.putExtra("framerate", framerate)
+        intent.putExtra("bitrate", bitrate)
+        intent.putExtra("pin", pin)
+
+        Log.i(
+            "RStreamClient",
+            "Starting stream for ${host.ipAddress} with quality: $videoQuality, framerate: $framerate, bitrate: $bitrate, pin: $pin"
+        )
+
+        startActivity(intent)
     }
 
     override fun onResume() {

@@ -3,7 +3,8 @@ use gstreamer as gst;
 
 use async_std::net::{TcpListener, TcpStream};
 use async_std::task;
-use async_tungstenite::tungstenite::protocol::Message;
+use async_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
+use async_tungstenite::tungstenite::protocol::{CloseFrame, Message};
 use chrono::{SubsecRound, Utc};
 use futures::prelude::*;
 use futures::{
@@ -50,6 +51,7 @@ pub struct StreamingState {
     pub(crate) native_resolution: (u32, u32),
     pub(crate) stream_config: Option<StreamConfig>,
     pub(crate) connection_status: ConnectionStatus,
+    pub(crate) pin: String,
 }
 
 pub static STREAMING_STATE_GUARD: Mutex<Option<StreamingState>> = Mutex::new(None);
@@ -321,10 +323,12 @@ async fn handle_connection(
     let broadcast_incoming = incoming
         .try_filter(|msg| future::ready(!msg.is_close()))
         .try_for_each(|msg| {
+            let current_peer_map = peer_map.clone();
+
             // Handle the incoming message/command
             if msg.is_text() {
                 let text_msg = msg.clone();
-                handle_text_message(text_msg, addr);
+                handle_text_message(text_msg, addr, current_peer_map);
             }
 
             let peers = peer_map.lock().unwrap();
@@ -388,16 +392,15 @@ pub async fn run_websocket(port: u32) -> Result<(), IoError> {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StreamConfigMessage {
-    pub msg_type: String,
+    pub pin: String,
     pub video_width: u32,
     pub video_height: u32,
     pub framerate: u32,
     pub bitrate: u32,
-    pub pin: u32,
 }
 
 // Video control via WebSocket.
-fn handle_text_message(msg: Message, addr: SocketAddr) {
+fn handle_text_message(msg: Message, addr: SocketAddr, peer_map: PeerMap) {
     let text = match msg {
         Message::Text(t) => t,
         _ => return, // Handle other message types
@@ -405,27 +408,49 @@ fn handle_text_message(msg: Message, addr: SocketAddr) {
 
     match serde_json::from_str::<StreamConfigMessage>(&text) {
         Ok(config_msg) => {
-            info!("✅ Config received successfully:\n\tType: {}\n\tVideo Size: {}x{}\n\tBitrate: {}\n\tPIN: {}",
-                config_msg.msg_type, config_msg.video_width, config_msg.video_height, config_msg.bitrate, config_msg.pin);
+            info!(
+                "✅ Stream config received successfully:\n\tPIN: {}\n\tVideo Size: {}x{}\n\tBitrate: {}",
+                config_msg.pin, config_msg.video_width, config_msg.video_height, config_msg.bitrate
+            );
+
+            let mut authenticated = false;
 
             {
                 let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
                 if let Some(state) = guard.as_mut() {
-                    let config = StreamConfig {
-                        resolution: (config_msg.video_width, config_msg.video_height),
-                        framerate: config_msg.framerate,
-                        bitrate: config_msg.bitrate,
-                    };
+                    authenticated = state.pin == config_msg.pin;
 
-                    state.stream_config = Some(config);
-                    state.connection_status = ConnectionStatus::Connected;
+                    if authenticated {
+                        let config = StreamConfig {
+                            resolution: (config_msg.video_width, config_msg.video_height),
+                            framerate: config_msg.framerate,
+                            bitrate: config_msg.bitrate,
+                        };
+
+                        state.stream_config = Some(config);
+                        state.connection_status = ConnectionStatus::Connected;
+                    }
                 }
             }
 
-            // Spawn a task to run the blocking pipeline start function
-            task::spawn_blocking(move || {
-                start_gstreamer_pipeline(addr, config_msg);
-            });
+            if authenticated {
+                // Spawn a task to run the blocking pipeline start function
+                task::spawn_blocking(move || {
+                    start_gstreamer_pipeline(addr, config_msg);
+                });
+            } else {
+                warn!("Authentication failed for {}. Closing connection.", addr);
+                if let Some(tx) = peer_map.lock().unwrap().get(&addr) {
+                    if let Err(e) = tx.unbounded_send(Message::Close(Some(CloseFrame {
+                        code: CloseCode::Invalid,
+                        reason: "Authentication Failed".into(),
+                    }))) {
+                        error!("Failed to send close message to {}: {}", addr, e);
+                    }
+                }
+                // The `broadcast_incoming` loop will eventually detect the send error or the actual close
+                // and the connection will be handled as disconnected by the `future::select` below.
+            }
         }
         Err(e) => {
             error!(

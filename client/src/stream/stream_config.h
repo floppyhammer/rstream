@@ -5,5 +5,5 @@ struct StreamConfig {
     int video_height;
     int framerate;
     int bitrate; // Mbps
-    int pin;
+    char pin[5]; // Ends in /0
 };

@@ -1,5 +1,5 @@
 use crate::discovery::run_announcer;
-use crate::gui::config::Config;
+use crate::gui::config::AppConfig;
 use crate::input::{init_enigo, init_vigem, run_enet_server};
 use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
@@ -14,14 +14,14 @@ use log::info;
 use tray_icon::menu::{MenuEvent, MenuId};
 
 pub struct App {
-    config: Config,
+    config: AppConfig,
 
     pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
 
 impl Default for App {
     fn default() -> Self {
-        let mut config = Config::new();
+        let mut config = AppConfig::new();
         match config.read() {
             Ok(_) => {
                 info!("Loaded config file.")
@@ -39,6 +39,7 @@ impl Default for App {
                 native_resolution: (1920, 1080),
                 stream_config: None,
                 connection_status: ConnectionStatus::Ready,
+                pin: config.pin.clone(),
             };
             *guard = Some(streaming_state);
         }
@@ -206,6 +207,15 @@ impl eframe::App for App {
 
                     if button_response.clicked() {
                         self.config.pin = crate::gui::config::generate_pin(4);
+
+                        {
+                            let mut state_lock = STREAMING_STATE_GUARD.lock().unwrap();
+                            let state = state_lock
+                                .as_mut()
+                                .expect("Streaming state was not initialized!");
+
+                            state.pin = self.config.pin.clone();
+                        }
                     }
 
                     if ui.ui_contains_pointer() {
@@ -272,23 +282,14 @@ impl eframe::App for App {
 
                 ui.add_space(8.0);
 
-                // CollapsingHeader::new("Host settings")
-                //     .default_open(true)
-                //     .show(ui, |ui| {
-                //         ui.checkbox(option1_enabled, "option1");
-                //         ui.checkbox(option2_enabled, "option2");
-                //     });
-                //
-                // ui.add_space(8.0);
-
-                CollapsingHeader::new("Connected Peers")
+                CollapsingHeader::new("Client Info")
                     .default_open(true)
                     .show(ui, |ui| {
                         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
 
                         if let Some(state) = guard.as_mut() {
                             if state.peers.is_empty() {
-                                ui.label("None");
+                                ui.label("Not Available");
                             }
 
                             for p in &state.peers {

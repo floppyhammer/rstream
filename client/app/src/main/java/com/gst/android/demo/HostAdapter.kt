@@ -8,8 +8,11 @@ import androidx.recyclerview.widget.RecyclerView
 
 data class Host(val name: String, val ipAddress: String)
 
-class HostAdapter(private val hosts: MutableList<Host>, private val onItemClick: (Host) -> Unit) :
-    RecyclerView.Adapter<HostAdapter.HostViewHolder>() {
+class HostAdapter(
+    private val hosts: MutableList<Host>,
+    private val onItemClick: (Host) -> Unit,
+    private val onItemLongClick: (Host) -> Unit
+) : RecyclerView.Adapter<HostAdapter.HostViewHolder>() {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HostViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.host_item, parent, false)
@@ -20,6 +23,10 @@ class HostAdapter(private val hosts: MutableList<Host>, private val onItemClick:
         val host = hosts[position]
         holder.bind(host)
         holder.itemView.setOnClickListener { onItemClick(host) }
+        holder.itemView.setOnLongClickListener {
+            onItemLongClick(host)
+            true
+        }
     }
 
     override fun getItemCount() = hosts.size

@@ -335,13 +335,13 @@ void stream_app_stop(MyStreamApp *app) {
         gst_element_send_event(app->pipeline, gst_event_new_eos());
 
         // Wait for an EOS message on the pipeline bus.
-        ALOGI("Waiting for pipeline EOS");
-        GstMessage *msg = NULL;
-        msg = gst_bus_timed_pop_filtered(GST_ELEMENT_BUS(app->pipeline),
-                                         GST_CLOCK_TIME_NONE,
-                                         GST_MESSAGE_EOS | GST_MESSAGE_ERROR);
-        //! @todo Should check if we got an error message here or an eos.
-        (void)msg;
+//        ALOGI("Waiting for pipeline EOS");
+//        GstMessage *msg = NULL;
+//        msg = gst_bus_timed_pop_filtered(GST_ELEMENT_BUS(app->pipeline),
+//                                         GST_CLOCK_TIME_NONE,
+//                                         GST_MESSAGE_EOS | GST_MESSAGE_ERROR);
+//        //! @todo Should check if we got an error message here or an eos.
+//        (void)msg;
 
         // Completely stop the pipeline.
         gst_element_set_state(app->pipeline, GST_STATE_NULL);
@@ -352,11 +352,11 @@ void stream_app_stop(MyStreamApp *app) {
 
     gst_clear_object(&app->context);
 
-    {
-        g_main_loop_quit(app->loop);
-        os_thread_helper_stop(&app->play_thread);
-        ALOGI("Quited gstreamer thread.");
-    }
+    g_main_loop_quit(app->loop);
+    ALOGI("Quited gstreamer main loop.");
+
+    os_thread_helper_stop(&app->play_thread);
+    ALOGI("Stopped play thread.");
 
     g_clear_object(&app->loop);
 }

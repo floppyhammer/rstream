@@ -431,7 +431,7 @@ void my_connection_send_stream_config(MyConnection *conn) {
     json_builder_add_int_value(builder, config.bitrate);
 
     json_builder_set_member_name(builder, "pin");
-    json_builder_add_int_value(builder, config.pin);
+    json_builder_add_string_value(builder, config.pin);
 
     json_builder_end_object(builder);
 

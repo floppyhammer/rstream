@@ -43,6 +43,7 @@ struct MyState {
     std::string video_quality;
     uint32_t framerate;
     uint32_t bitrate;
+    std::string pin;
 
     std::unique_ptr<Renderer> renderer;
 

@@ -1,7 +1,7 @@
+use log::debug;
 use serde_json::{json, Value};
 use std::fs::File;
 use std::io::prelude::*;
-use log::debug;
 
 const CONFIG_FILE: &str = "config.json";
 
@@ -18,61 +18,18 @@ pub(crate) fn generate_pin(length: usize) -> String {
     pin
 }
 
-#[derive(PartialEq, Clone)]
-pub enum PeerManagementType {
-    SinglePeer,
-    MultiplePeersSingleControl,
-    MultiplePeersMultipleControl,
-}
-
-impl std::fmt::Display for PeerManagementType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PeerManagementType::SinglePeer => write!(f, "SinglePeer"),
-            PeerManagementType::MultiplePeersSingleControl => {
-                write!(f, "MultiplePeersSingleControl")
-            }
-            PeerManagementType::MultiplePeersMultipleControl => {
-                write!(f, "MultiplePeersMultipleControl")
-            }
-        }
-    }
-}
-
-impl PeerManagementType {
-    fn from_u32(value: u32) -> PeerManagementType {
-        match value {
-            0 => PeerManagementType::SinglePeer,
-            1 => PeerManagementType::MultiplePeersSingleControl,
-            2 => PeerManagementType::MultiplePeersMultipleControl,
-            _ => panic!("Unknown value: {}", value),
-        }
-    }
-
-    fn to_u32(&self) -> u32 {
-        match self {
-            PeerManagementType::SinglePeer => 0,
-            PeerManagementType::MultiplePeersSingleControl => 1,
-            PeerManagementType::MultiplePeersMultipleControl => 2,
-        }
-    }
-}
-
-pub struct Config {
-    pub peer_management_type: PeerManagementType,
-    pub pin: String,
+pub struct AppConfig {
     pub dark_mode: bool,
+    pub pin: String,
 }
 
-impl Config {
+impl AppConfig {
     pub fn new() -> Self {
-        let peer_management_type = PeerManagementType::SinglePeer;
         let pin = generate_pin(4);
 
         Self {
-            peer_management_type,
-            pin,
             dark_mode: true,
+            pin,
         }
     }
 
@@ -93,9 +50,6 @@ impl Config {
             json_string,
         );
 
-        self.peer_management_type = PeerManagementType::from_u32(
-            json_value["peer_management_type"].as_u64().unwrap_or(0) as u32,
-        );
         self.pin = String::from(json_value["pin"].as_str().unwrap_or(""));
         self.dark_mode = json_value["dark_mode"].as_bool().unwrap_or(true);
 
@@ -104,7 +58,6 @@ impl Config {
 
     pub fn write(&mut self) -> std::io::Result<()> {
         let json_value = json!({
-            "peer_management_type": self.peer_management_type.to_u32(),
             "dark_mode": self.dark_mode,
             "pin": self.pin,
         });

@@ -89,6 +89,8 @@ void onAppCmd(struct android_app *app, int32_t cmd) {
 
             config.framerate = state_.framerate;
             config.bitrate = state_.bitrate;
+            config.pin[4] = '\0';
+            state_.pin.copy(config.pin, 4);
 
             my_connection_set_stream_config(state_.connection, &config);
 
@@ -240,12 +242,16 @@ void android_main(struct android_app *app) {
         state_.video_quality = retrieve_data_string(env, intentObject, getStringExtraMethod, "video_quality");
         state_.framerate = std::stoi(retrieve_data_string(env, intentObject, getStringExtraMethod, "framerate"));
         state_.bitrate = std::stoi(retrieve_data_string(env, intentObject, getStringExtraMethod, "bitrate"));
+        state_.pin = retrieve_data_string(env, intentObject, getStringExtraMethod, "pin");
 
-        ALOGI("Got intent strings from native: host_ip: %s video_quality: %s framerate: %d bitrate: %d",
-              state_.host_ip.c_str(),
-              state_.video_quality.c_str(),
-              state_.framerate,
-              state_.bitrate);
+        ALOGI(
+            "Got intent strings from native: host_ip: %s video_quality: %s framerate: %d bitrate: %d "
+            "pin: %s",
+            state_.host_ip.c_str(),
+            state_.video_quality.c_str(),
+            state_.framerate,
+            state_.bitrate,
+            state_.pin.c_str());
 
         env->DeleteLocalRef(intentClass);
         env->DeleteLocalRef(intentObject);
