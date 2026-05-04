@@ -11,50 +11,78 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun SettingsScreen(
+fun SettingsDialog(
     videoQuality: String,
     framerate: String,
     bitrate: String,
-    onVideoQualityClick: () -> Unit,
-    onFramerateClick: () -> Unit,
-    onBitrateClick: () -> Unit,
-    onBackClick: () -> Unit,
+    onVideoQualityChange: (String) -> Unit,
+    onFramerateChange: (String) -> Unit,
+    onBitrateChange: (Int) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "Settings",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(bottom = 16.dp)
-            )
-        }
+    var showQualityDialog by remember { mutableStateOf(false) }
+    var showFramerateDialog by remember { mutableStateOf(false) }
+    var showBitrateDialog by remember { mutableStateOf(false) }
 
-        SettingsOption(
-            label = "Video Quality: ${videoQuality.uppercase()}",
-            onClick = onVideoQualityClick
-        )
-        SettingsOption(
-            label = "Framerate: $framerate FPS",
-            onClick = onFramerateClick
-        )
-        SettingsOption(
-            label = "Bitrate: $bitrate Mbps",
-            onClick = onBitrateClick
-        )
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        Button(onClick = onBackClick) {
-            Text("Back")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Settings", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                SettingsOption(
+                    label = "Video Quality: ${videoQuality.uppercase()}",
+                    onClick = { showQualityDialog = true }
+                )
+                SettingsOption(
+                    label = "Framerate: $framerate FPS",
+                    onClick = { showFramerateDialog = true }
+                )
+                SettingsOption(
+                    label = "Bitrate: $bitrate Mbps",
+                    onClick = { showBitrateDialog = true }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
         }
+    )
+
+    if (showQualityDialog) {
+        SelectionDialog(
+            title = "Select Video Quality",
+            options = listOf("720p", "1080p", "1440p", "4k"),
+            onSelect = {
+                onVideoQualityChange(it)
+                showQualityDialog = false
+            },
+            onDismiss = { showQualityDialog = false }
+        )
+    }
+
+    if (showFramerateDialog) {
+        SelectionDialog(
+            title = "Select Framerate",
+            options = listOf("15", "30", "60", "90"),
+            onSelect = {
+                onFramerateChange(it)
+                showFramerateDialog = false
+            },
+            onDismiss = { showFramerateDialog = false }
+        )
+    }
+
+    if (showBitrateDialog) {
+        BitrateDialog(
+            initialBitrate = bitrate.toIntOrNull() ?: 10,
+            onConfirm = {
+                onBitrateChange(it)
+                showBitrateDialog = false
+            },
+            onDismiss = { showBitrateDialog = false }
+        )
     }
 }
 

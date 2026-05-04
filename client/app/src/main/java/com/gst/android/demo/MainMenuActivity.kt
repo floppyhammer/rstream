@@ -58,11 +58,23 @@ class MainMenuActivity : AppCompatActivity() {
 
         setContent {
             var showConnectDialog by remember { mutableStateOf(false) }
+            var showSettingsDialog by remember { mutableStateOf(false) }
             var pinDialogHost by remember { mutableStateOf<Host?>(null) }
             var clearPinDialogHost by remember { mutableStateOf<Host?>(null) }
 
             val sharedPref = remember { getSharedPreferences("MyPrefsFile", Context.MODE_PRIVATE) }
             val initialIp = remember { sharedPref.getString("host_ip", "") ?: "" }
+            
+            val settingsPref = remember { getSharedPreferences("SettingsPrefs", Context.MODE_PRIVATE) }
+            var videoQuality by remember { 
+                mutableStateOf(settingsPref.getString("video_quality", "1080p") ?: "1080p") 
+            }
+            var framerate by remember { 
+                mutableStateOf(settingsPref.getString("framerate", "60") ?: "60") 
+            }
+            var bitrate by remember { 
+                mutableStateOf(settingsPref.getString("bitrate", "10") ?: "10") 
+            }
 
             MainMenuScreen(
                 hosts = hostList,
@@ -70,8 +82,7 @@ class MainMenuActivity : AppCompatActivity() {
                     showConnectDialog = true
                 },
                 onSettingsClick = {
-                    val intent = Intent(this, SettingsActivity::class.java)
-                    startActivity(intent)
+                    showSettingsDialog = true
                 },
                 onHostClick = { host ->
                     val pinPrefs = getSharedPreferences(PIN_PREFS_NAME, Context.MODE_PRIVATE)
@@ -97,6 +108,27 @@ class MainMenuActivity : AppCompatActivity() {
                         showConnectDialog = false
                     },
                     onDismiss = { showConnectDialog = false }
+                )
+            }
+
+            if (showSettingsDialog) {
+                SettingsDialog(
+                    videoQuality = videoQuality,
+                    framerate = framerate,
+                    bitrate = bitrate,
+                    onVideoQualityChange = {
+                        videoQuality = it
+                        settingsPref.edit().putString("video_quality", it).apply()
+                    },
+                    onFramerateChange = {
+                        framerate = it
+                        settingsPref.edit().putString("framerate", it).apply()
+                    },
+                    onBitrateChange = {
+                        bitrate = it.toString()
+                        settingsPref.edit().putString("bitrate", bitrate).apply()
+                    },
+                    onDismiss = { showSettingsDialog = false }
                 )
             }
 
