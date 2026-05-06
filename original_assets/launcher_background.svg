@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+
+<svg
+   version="1.1"
+   id="Layer_1"
+   viewBox="0 0 400.00001 400.00001"
+   xml:space="preserve"
+   sodipodi:docname="launcher_background.svg"
+   width="400"
+   height="400"
+   inkscape:version="1.4.3 (0d15f75, 2025-12-25)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+   id="defs9"><linearGradient
+     id="linearGradient2"
+     inkscape:collect="always"><stop
+       style="stop-color:#00cdff;stop-opacity:1;"
+       offset="0"
+       id="stop2" /><stop
+       style="stop-color:#87e6ff;stop-opacity:1;"
+       offset="1"
+       id="stop3" /></linearGradient><linearGradient
+     inkscape:collect="always"
+     xlink:href="#linearGradient2"
+     id="linearGradient3"
+     x1="399.99997"
+     y1="-200.00002"
+     x2="-1.9073486e-05"
+     y2="-200.00002"
+     gradientUnits="userSpaceOnUse" /></defs><sodipodi:namedview
+   id="namedview9"
+   pagecolor="#505050"
+   bordercolor="#ffffff"
+   borderopacity="1"
+   inkscape:showpageshadow="0"
+   inkscape:pageopacity="0"
+   inkscape:pagecheckerboard="1"
+   inkscape:deskcolor="#505050"
+   inkscape:zoom="1.1117619"
+   inkscape:cx="103.88915"
+   inkscape:cy="248.70433"
+   inkscape:window-width="1920"
+   inkscape:window-height="1010"
+   inkscape:window-x="-6"
+   inkscape:window-y="-6"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Layer_1" />
+
+
+
+
+<rect
+   x="-1.9073486e-05"
+   y="-400"
+   style="fill:url(#linearGradient3);fill-opacity:1;stroke:none;stroke-width:1.74797;opacity:1"
+   width="400"
+   height="399.99997"
+   id="rect4"
+   transform="rotate(90)" />
+
+
+
+
+
+</svg>
