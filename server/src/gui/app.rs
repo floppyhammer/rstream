@@ -1,6 +1,6 @@
 use crate::discovery::run_announcer;
 use crate::gui::config::AppConfig;
-use crate::input::{init_enigo, init_vigem, run_enet_server};
+use crate::input::{init_enigo, run_enet_server};
 use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
 use async_std::task;
 use eframe::egui;
@@ -46,8 +46,6 @@ impl Default for App {
 
         // Initialize Enigo here, guaranteeing it happens before any messages are processed.
         init_enigo();
-
-        init_vigem();
 
         let _ws_handle = task::spawn(run_websocket(5600));
 
@@ -339,6 +337,7 @@ impl eframe::App for App {
 
         // Cleanup when the async task somehow exits (e.g., Ctrl+C, though this might be hard)
         // Running a final stop ensures cleanup if possible.
+        crate::input::deinit_vigem();
         crate::stream::stop_gstreamer_pipeline()
     }
 }

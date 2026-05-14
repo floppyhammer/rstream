@@ -24,7 +24,6 @@ static ENIGO_INIT: Once = Once::new();
 
 static VIGEM_GUARD: Mutex<Option<Xbox360Wired<Client>>> = Mutex::new(None);
 static GAMEPAD_GUARD: Mutex<Option<XGamepad>> = Mutex::new(None);
-static VIGEM_INIT: Once = Once::new();
 
 // A function to initialize Enigo exactly once.
 pub fn init_enigo() {
@@ -35,34 +34,62 @@ pub fn init_enigo() {
     });
 }
 
-// A function to initialize Vigem exactly once.
+// A function to initialize Vigem.
 pub fn init_vigem() {
-    VIGEM_INIT.call_once(|| {
-        // 1. Connect to the ViGEmBus driver service
-        let client = vigem::Client::connect().unwrap();
-        log::info!("Vigem initialized.");
+    let mut vigem_lock = VIGEM_GUARD.lock().unwrap();
+    if vigem_lock.is_some() {
+        return;
+    }
 
-        // 2. Create the virtual controller target (Xbox 360 Wired)
-        let id = TargetId::XBOX360_WIRED;
-        let mut target = vigem::Xbox360Wired::new(client, id);
+    // 1. Connect to the ViGEmBus driver service
+    let client = match vigem::Client::connect() {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Failed to connect to ViGEmBus: {:?}", e);
+            return;
+        }
+    };
+    log::info!("Vigem initialized.");
 
-        // 3. Plug in the virtual controller
-        log::info!("Plugging in virtual Xbox 360 controller...");
-        target.plugin().unwrap();
+    // 2. Create the virtual controller target (Xbox 360 Wired)
+    let id = TargetId::XBOX360_WIRED;
+    let mut target = vigem::Xbox360Wired::new(client, id);
 
-        // 4. Wait for the virtual controller to be ready to accept updates
-        log::info!("Waiting for controller to be ready...");
-        target.wait_ready().unwrap();
+    // 3. Plug in the virtual controller
+    log::info!("Plugging in virtual Xbox 360 controller...");
+    if let Err(e) = target.plugin() {
+        log::error!("Failed to plugin virtual controller: {:?}", e);
+        return;
+    }
 
-        *VIGEM_GUARD.lock().unwrap() = Some(target);
+    // 4. Wait for the virtual controller to be ready to accept updates
+    log::info!("Waiting for controller to be ready...");
+    if let Err(e) = target.wait_ready() {
+        log::error!("Failed to wait for controller ready: {:?}", e);
+        let _ = target.unplug();
+        return;
+    }
 
-        let gamepad = XGamepad {
-            ..Default::default()
-        };
-        *GAMEPAD_GUARD.lock().unwrap() = Some(gamepad);
+    *vigem_lock = Some(target);
 
-        log::info!("Controller is ready.");
+    let mut gamepad_lock = GAMEPAD_GUARD.lock().unwrap();
+    *gamepad_lock = Some(XGamepad {
+        ..Default::default()
     });
+
+    log::info!("Controller is ready.");
+}
+
+// A function to deinitialize Vigem.
+pub fn deinit_vigem() {
+    let mut vigem_lock = VIGEM_GUARD.lock().unwrap();
+    if let Some(mut target) = vigem_lock.take() {
+        let _ = target.unplug();
+        log::info!("Virtual Xbox 360 controller unplugged.");
+    }
+
+    let mut gamepad_lock = GAMEPAD_GUARD.lock().unwrap();
+    *gamepad_lock = None;
 }
 
 // Function to start the ENet server host
@@ -102,6 +129,7 @@ pub async fn run_enet_server() -> Result<(), IoError> {
                             peer.id().0,
                             peer.address().unwrap()
                         );
+                        init_vigem();
                     }
                     enet::Event::Disconnect { peer, .. } => {
                         log::info!(
@@ -109,6 +137,7 @@ pub async fn run_enet_server() -> Result<(), IoError> {
                             peer.id().0,
                             peer.address().unwrap()
                         );
+                        deinit_vigem();
                     }
                     enet::Event::Receive {
                         peer: _,
@@ -287,7 +316,6 @@ fn handle_enet_packet(packet: &enet::Packet) {
     let enigo = enigo_lock.as_mut().expect("Enigo was not initialized!");
 
     let mut gamepad_lock = GAMEPAD_GUARD.lock().unwrap();
-    let gamepad = gamepad_lock.as_mut().expect("Gamepad was not initialized!");
 
     let mut pressed = false;
     let mut button_to_set = None;
@@ -339,113 +367,121 @@ fn handle_enet_packet(packet: &enet::Packet) {
             enigo.button(Button::Right, Click).unwrap();
             log::debug!("CursorRightClick pos {},{}", x_coord as i32, y_coord as i32);
         }
-        InputType::GamepadButtonX => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::X);
-
-            log::debug!("Gamepad button X {}", pressed);
-        }
-        InputType::GamepadButtonY => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::Y);
-            log::debug!("Gamepad button Y {}", pressed);
-        }
-        InputType::GamepadButtonA => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::A);
-            log::debug!("Gamepad button A {}", pressed);
-        }
-        InputType::GamepadButtonB => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::B);
-            log::debug!("Gamepad button B {}", pressed);
-        }
-        InputType::GamepadButtonL1 => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::LB);
-            log::debug!("Gamepad button LB {}", pressed);
-        }
-        InputType::GamepadButtonR1 => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::RB);
-            log::debug!("Gamepad button RB {}", pressed);
-        }
-        InputType::GamepadButtonL2 => {
-            log::debug!("Gamepad button LT {}", x);
-
-            gamepad.left_trigger = (x * 256.0) as u8;
-        }
-        InputType::GamepadButtonR2 => {
-            log::debug!("Gamepad button RT {}", x);
-
-            gamepad.right_trigger = (x * 256.0) as u8;
-        }
-        InputType::GamepadButtonStart => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::START);
-            log::debug!("Gamepad button START {}", pressed);
-        }
-        InputType::GamepadButtonSelect => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::BACK);
-            log::debug!("Gamepad button SELECT {}", pressed);
-        }
-        InputType::GamepadButtonUp => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::UP);
-            log::debug!("Gamepad button UP {}", pressed);
-        }
-        InputType::GamepadButtonDown => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::DOWN);
-            log::debug!("Gamepad button DOWN {}", pressed);
-        }
-        InputType::GamepadButtonLeft => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::LEFT);
-            log::debug!("Gamepad button LEFT {}", pressed);
-        }
-        InputType::GamepadButtonRight => {
-            pressed = x > 0.0;
-            button_to_set = Some(vigem_client::XButtons::RIGHT);
-            log::debug!("Gamepad button RIGHT {}", pressed);
-        }
-        InputType::GamepadLeftStick => {
-            log::debug!("Gamepad Left Stick ({}, {})", x, y);
-
-            gamepad.thumb_lx = (x * 32767.0) as i16;
-            gamepad.thumb_ly = (y * -32767.0) as i16;
-        }
-        InputType::GamepadRightStick => {
-            log::debug!("Gamepad Right Stick ({}, {})", x, y);
-
-            gamepad.thumb_rx = (x * 32767.0) as i16;
-            gamepad.thumb_ry = (y * -32767.0) as i16;
-        }
         InputType::KeyboardSuper => {
             pressed = x > 0.0;
             log::debug!("Keyboard SUPER {}", pressed);
 
             enigo.key(Key::Meta, Direction::Click).unwrap();
         }
-    }
+        _ => {
+            // Gamepad inputs
+            if let Some(gamepad) = gamepad_lock.as_mut() {
+                match input_type {
+                    InputType::GamepadButtonX => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::X);
 
-    if let Some(button) = button_to_set {
-        if pressed {
-            // Set the bit for the A button (Button is pressed)
-            gamepad.buttons.raw |= button;
-        } else {
-            // Clear the bit for the A button (Button is released)
-            gamepad.buttons.raw &= !button;
+                        log::debug!("Gamepad button X {}", pressed);
+                    }
+                    InputType::GamepadButtonY => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::Y);
+                        log::debug!("Gamepad button Y {}", pressed);
+                    }
+                    InputType::GamepadButtonA => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::A);
+                        log::debug!("Gamepad button A {}", pressed);
+                    }
+                    InputType::GamepadButtonB => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::B);
+                        log::debug!("Gamepad button B {}", pressed);
+                    }
+                    InputType::GamepadButtonL1 => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::LB);
+                        log::debug!("Gamepad button LB {}", pressed);
+                    }
+                    InputType::GamepadButtonR1 => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::RB);
+                        log::debug!("Gamepad button RB {}", pressed);
+                    }
+                    InputType::GamepadButtonL2 => {
+                        log::debug!("Gamepad button LT {}", x);
+
+                        gamepad.left_trigger = (x * 256.0) as u8;
+                    }
+                    InputType::GamepadButtonR2 => {
+                        log::debug!("Gamepad button RT {}", x);
+
+                        gamepad.right_trigger = (x * 256.0) as u8;
+                    }
+                    InputType::GamepadButtonStart => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::START);
+                        log::debug!("Gamepad button START {}", pressed);
+                    }
+                    InputType::GamepadButtonSelect => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::BACK);
+                        log::debug!("Gamepad button SELECT {}", pressed);
+                    }
+                    InputType::GamepadButtonUp => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::UP);
+                        log::debug!("Gamepad button UP {}", pressed);
+                    }
+                    InputType::GamepadButtonDown => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::DOWN);
+                        log::debug!("Gamepad button DOWN {}", pressed);
+                    }
+                    InputType::GamepadButtonLeft => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::LEFT);
+                        log::debug!("Gamepad button LEFT {}", pressed);
+                    }
+                    InputType::GamepadButtonRight => {
+                        pressed = x > 0.0;
+                        button_to_set = Some(vigem_client::XButtons::RIGHT);
+                        log::debug!("Gamepad button RIGHT {}", pressed);
+                    }
+                    InputType::GamepadLeftStick => {
+                        log::debug!("Gamepad Left Stick ({}, {})", x, y);
+
+                        gamepad.thumb_lx = (x * 32767.0) as i16;
+                        gamepad.thumb_ly = (y * -32767.0) as i16;
+                    }
+                    InputType::GamepadRightStick => {
+                        log::debug!("Gamepad Right Stick ({}, {})", x, y);
+
+                        gamepad.thumb_rx = (x * 32767.0) as i16;
+                        gamepad.thumb_ry = (y * -32767.0) as i16;
+                    }
+                    _ => {}
+                }
+
+                if let Some(button) = button_to_set {
+                    if pressed {
+                        // Set the bit for the A button (Button is pressed)
+                        gamepad.buttons.raw |= button;
+                    } else {
+                        // Clear the bit for the A button (Button is released)
+                        gamepad.buttons.raw &= !button;
+                    }
+                }
+
+                let mut vigem_lock = VIGEM_GUARD.lock().unwrap();
+                if let Some(vigem) = vigem_lock.as_mut() {
+                    // Update the target
+                    let result = vigem.update(&gamepad);
+                    if let Err(e) = result {
+                        eprintln!("Failed to update ViGEm target: {:?}", e);
+                    }
+                }
+            }
         }
-    }
-
-    let mut vigem_lock = VIGEM_GUARD.lock().unwrap();
-    let vigem = vigem_lock.as_mut().expect("Vigem was not initialized!");
-
-    // Update the target
-    let result = vigem.update(&gamepad);
-    if let Err(e) = result {
-        eprintln!("Failed to update ViGEm target: {:?}", e);
     }
 }
