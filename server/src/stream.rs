@@ -9,6 +9,7 @@ use chrono::{SubsecRound, Utc};
 use futures::prelude::*;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
+    channel::oneshot,
     future, pin_mut,
 };
 use gstreamer::glib::ControlFlow;
@@ -37,6 +38,8 @@ type PeerMap = Arc<Mutex<HashMap<SocketAddr, Tx>>>;
 pub struct Peer {
     pub(crate) ip: String,
     pub(crate) time_connected: String,
+    pub(crate) tx: Tx,
+    pub(crate) shutdown_tx: Option<oneshot::Sender<()>>,
 }
 
 pub struct StreamConfig {
@@ -294,6 +297,18 @@ async fn handle_connection(
 
     info!("WebSocket connection established: {}", addr);
 
+    // Initialize gstreamer.
+    let init_gst = move || {
+        init_gstreamer();
+    };
+    start_once.call_once(init_gst);
+
+    // Insert the write part of this peer to the peer map.
+    let (tx, rx) = unbounded();
+    peer_map.lock().unwrap().insert(addr, tx.clone());
+
+    let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+
     {
         let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
         let date_as_string = Utc::now().trunc_subsecs(0).to_string();
@@ -303,20 +318,12 @@ async fn handle_connection(
                 Peer {
                     ip: addr.to_string(),
                     time_connected: date_as_string,
+                    tx: tx,
+                    shutdown_tx: Some(shutdown_tx),
                 },
             );
         }
     }
-
-    // Initialize gstreamer.
-    let init_gst = move || {
-        init_gstreamer();
-    };
-    start_once.call_once(init_gst);
-
-    // Insert the write part of this peer to the peer map.
-    let (tx, rx) = unbounded();
-    peer_map.lock().unwrap().insert(addr, tx);
 
     let (outgoing, incoming) = ws_stream.split();
 
@@ -346,8 +353,14 @@ async fn handle_connection(
 
     let receive_from_others = rx.map(Ok).forward(outgoing);
 
-    pin_mut!(broadcast_incoming, receive_from_others);
-    future::select(broadcast_incoming, receive_from_others).await;
+    pin_mut!(broadcast_incoming, receive_from_others, shutdown_rx);
+
+    // Select on both the connection futures AND the shutdown signal
+    future::select(
+        future::select(broadcast_incoming, receive_from_others),
+        shutdown_rx,
+    )
+    .await;
 
     info!("WebSocket {} disconnected", &addr);
     peer_map.lock().unwrap().remove(&addr);
@@ -365,6 +378,21 @@ async fn handle_connection(
     if peer_map.lock().unwrap().is_empty() {
         // Spawn a task to run the blocking pipeline stop function
         task::spawn_blocking(stop_gstreamer_pipeline);
+    }
+}
+
+pub fn disconnect_peer(addr: SocketAddr) {
+    let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+    if let Some(state) = guard.as_mut() {
+        if let Some(peer) = state.peers.get_mut(&addr) {
+            // Send the shutdown signal to the async task
+            if let Some(shutdown_tx) = peer.shutdown_tx.take() {
+                let _ = shutdown_tx.send(());
+            }
+
+            // Also try to send a Close message as a courtesy (optional)
+            let _ = peer.tx.unbounded_send(Message::Close(None));
+        }
     }
 }
 

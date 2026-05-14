@@ -1,7 +1,9 @@
 use crate::discovery::run_announcer;
 use crate::gui::config::AppConfig;
 use crate::input::{init_enigo, run_enet_server};
-use crate::stream::{run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD};
+use crate::stream::{
+    disconnect_peer, run_websocket, ConnectionStatus, StreamingState, STREAMING_STATE_GUARD,
+};
 use async_std::task;
 use eframe::egui;
 use eframe::egui::{CollapsingHeader, RichText, ViewportCommand, Visuals};
@@ -270,24 +272,31 @@ impl eframe::App for App {
                 CollapsingHeader::new("Client Info")
                     .default_open(true)
                     .show(ui, |ui| {
-                        let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
+                        let mut peer_to_disconnect = None;
+                        {
+                            let mut guard = STREAMING_STATE_GUARD.lock().unwrap();
 
-                        if let Some(state) = guard.as_mut() {
-                            if state.peers.is_empty() {
-                                ui.label("Not Available");
-                            }
+                            if let Some(state) = guard.as_mut() {
+                                if state.peers.is_empty() {
+                                    ui.label("Not Available");
+                                }
 
-                            for p in &state.peers {
-                                ui.horizontal(|ui| {
-                                    if ui.button("Disconnect").clicked() {
-                                        println!("Disconnect");
-                                    };
-                                    ui.label(format!(
-                                        "(1) {} connected at: {}",
-                                        p.1.ip, p.1.time_connected
-                                    ));
-                                });
+                                for (addr, p) in &state.peers {
+                                    ui.horizontal(|ui| {
+                                        if ui.button("Disconnect").clicked() {
+                                            peer_to_disconnect = Some(*addr);
+                                        };
+                                        ui.label(format!(
+                                            "(1) {} connected at: {}",
+                                            p.ip, p.time_connected
+                                        ));
+                                    });
+                                }
                             }
+                        }
+
+                        if let Some(addr) = peer_to_disconnect {
+                            disconnect_peer(addr);
                         }
                     });
 
