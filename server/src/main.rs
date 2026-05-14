@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start_minimized = args.iter().any(|arg| arg == "--minimized");
 
     if start_minimized {
-        let mut visible = VISIBLE.lock().unwrap();
+        let mut visible = VISIBLE.lock()?;
         *visible = false;
     }
 
@@ -45,19 +45,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let quit_id = quit_item.id().clone();
 
     let tray_menu = Menu::new();
-    tray_menu.append(&quit_item).unwrap();
+    tray_menu.append(&quit_item)?;
 
     let _tray_icon = TrayIconBuilder::new()
         .with_icon(icon)
-        .with_tooltip("RStream Client")
+        .with_tooltip("RStream Server")
         .with_menu(Box::new(tray_menu))
         .build()?;
 
     let app = gui::app::App::default();
 
     let icon_image_bytes = include_bytes!("../assets/icon.png");
-    let image = image::load_from_memory(icon_image_bytes)
-        .unwrap()
+    let image = image::load_from_memory(icon_image_bytes)?
         .to_rgba8();
     let (img_width, img_height) = image.dimensions();
     let icon_data = egui::IconData {
