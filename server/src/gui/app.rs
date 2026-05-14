@@ -12,12 +12,9 @@ use egui::widgets::TextEdit;
 use local_ip_address::list_afinet_netifas;
 use log::{error, info};
 use std::process::Command;
-use tray_icon::menu::{MenuEvent, MenuId};
 
 pub struct App {
     config: AppConfig,
-
-    pub(crate) tray_menu_quit_id: Option<MenuId>,
 }
 
 impl Default for App {
@@ -65,8 +62,6 @@ impl Default for App {
 
         Self {
             config,
-
-            tray_menu_quit_id: None,
         }
     }
 }
@@ -113,21 +108,6 @@ impl eframe::App for App {
                 state.dpi_scale = scale_factor;
                 state.native_resolution =
                     (monitor_logical_size.x as u32, monitor_logical_size.y as u32);
-            }
-        }
-
-        let menu_channel = MenuEvent::receiver();
-        // Use try_recv() for non-blocking check
-        if let Ok(event) = menu_channel.try_recv() {
-            // Handle the menu click event
-
-            // event.id() returns a reference (&MenuId), so we compare it to a reference
-            match event.id() {
-                id if id == self.tray_menu_quit_id.as_ref().unwrap() => {
-                    info!("Tray Menu Event: Quit selected. Shutting down.");
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-                &_ => {}
             }
         }
 

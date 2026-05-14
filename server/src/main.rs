@@ -53,9 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_menu(Box::new(tray_menu))
         .build()?;
 
-    let mut app = gui::app::App::default();
-
-    app.tray_menu_quit_id = Some(quit_id);
+    let app = gui::app::App::default();
 
     let icon_image_bytes = include_bytes!("../assets/icon.png");
     let image = image::load_from_memory(icon_image_bytes)
@@ -82,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _ = eframe::run_native(
         format!("{} - {}", "RStream Server", VERSION).as_str(),
         native_options,
-        Box::new(|cc| {
+        Box::new(move |cc| {
             let style = Style {
                 visuals: Visuals::dark(),
                 ..Style::default()
@@ -92,6 +90,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let RawWindowHandle::Win32(handle) = cc.window_handle().unwrap().as_raw() else {
                 panic!("Unsupported platform");
             };
+
+            let context = cc.egui_ctx.clone();
+            let quit_id_cloned = quit_id.clone();
+            let handle_hwnd = handle.hwnd;
+
+            tray_icon::menu::MenuEvent::set_event_handler(Some(move |event: tray_icon::menu::MenuEvent| {
+                if event.id() == &quit_id_cloned {
+                    log::info!("Tray Menu Event: Quit selected. Shutting down.");
+
+                    // Show hidden window before sending quit command
+                    let window_handle = HWND(handle_hwnd.into());
+                    unsafe {
+                        ShowWindow(window_handle, SW_SHOWDEFAULT);
+                    }
+                    context.send_viewport_cmd(egui::ViewportCommand::Close);
+                    context.request_repaint();
+                }
+            }));
 
             {
                 let visible = VISIBLE.lock().unwrap();
@@ -103,11 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            // let context = cc.egui_ctx.clone();
-
             TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
-                // println!("TrayIconEvent: {:?}", event);
-
                 match event {
                     TrayIconEvent::Click {
                         button_state: MouseButtonState::Down,
@@ -115,44 +127,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ..
                     } => {
                         let mut visible = VISIBLE.lock().unwrap();
+                        let window_handle = HWND(handle.hwnd.into());
 
                         if *visible {
-                            let window_handle = HWND(handle.hwnd.into());
                             unsafe {
                                 ShowWindow(window_handle, SW_HIDE);
                             }
                             *visible = false;
                         } else {
-                            let window_handle = HWND(handle.hwnd.into());
                             unsafe {
                                 ShowWindow(window_handle, SW_SHOWDEFAULT);
                             }
                             *visible = true;
                         }
-
-                        // context.request_repaint();
                     }
                     _ => return,
                 }
-
-                let _event_id = event.id().clone();
-
-                // match event_id {
-                //     // Compare the event's ID with the stored IDs
-                //     id if id == quit_id => {
-                //         println!("Quit clicked! Exiting application.");
-                //         // Add your application cleanup and exit code here
-                //         break;
-                //     }
-                //     id if id == about_id => {
-                //         println!("About clicked! Showing info.");
-                //         // Add logic to show an 'About' window or dialog
-                //     }
-                //     _ => {
-                //         // Handle any other potential menu items
-                //         println!("Unknown menu item clicked with ID: {:?}", event.id());
-                //     }
-                // }
             }));
 
             Box::new(app)
