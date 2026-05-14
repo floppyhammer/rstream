@@ -87,16 +87,17 @@ impl eframe::App for App {
     /// Called each time the UI needs repainting, which may be many times per second.
     /// Put your widgets into a `SidePanel`, `TopPanel`, `CentralPanel`, `Window` or `Area`.
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // let close_requested = ctx.input(|i| i.viewport().close_requested());
-        // if close_requested {
-        //     let mut visible = VISIBLE.lock().unwrap();
-        //
-        //     if *visible {
-        //         ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-        //         ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
-        //         *visible = false;
-        //     }
-        // }
+        let close_requested = ctx.input(|i| i.viewport().close_requested());
+        if close_requested {
+            let allow_exit = crate::ALLOW_EXIT.lock().unwrap();
+            let mut visible = crate::VISIBLE.lock().unwrap();
+
+            if *visible && !*allow_exit {
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
+                *visible = false;
+            }
+        }
 
         {
             let scale_factor = get_scale_factor(ctx);
@@ -132,6 +133,10 @@ impl eframe::App for App {
                     }
 
                     if ui.button("Quit").clicked() {
+                        {
+                            let mut allow_exit = crate::ALLOW_EXIT.lock().unwrap();
+                            *allow_exit = true;
+                        }
                         ctx.send_viewport_cmd(ViewportCommand::Close)
                     }
                 });

@@ -24,7 +24,8 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 #[allow(dead_code)]
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-static VISIBLE: Mutex<bool> = Mutex::new(true);
+pub static VISIBLE: Mutex<bool> = Mutex::new(true);
+pub static ALLOW_EXIT: Mutex<bool> = Mutex::new(false);
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -90,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 panic!("Unsupported platform");
             };
 
-            let context = cc.egui_ctx.clone();
+            let context_menu = cc.egui_ctx.clone();
             let quit_id_cloned = quit_id.clone();
             let handle_hwnd = handle.hwnd;
 
@@ -98,13 +99,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if event.id() == &quit_id_cloned {
                     log::info!("Tray Menu Event: Quit selected. Shutting down.");
 
+                    {
+                        let mut allow_exit = ALLOW_EXIT.lock().unwrap();
+                        *allow_exit = true;
+                    }
+
                     // Show hidden window before sending quit command
                     let window_handle = HWND(handle_hwnd.into());
                     unsafe {
                         ShowWindow(window_handle, SW_SHOWDEFAULT);
                     }
-                    context.send_viewport_cmd(egui::ViewportCommand::Close);
-                    context.request_repaint();
+                    context_menu.send_viewport_cmd(egui::ViewportCommand::Close);
+                    context_menu.request_repaint();
                 }
             }));
 
@@ -118,6 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
+            let context_tray = cc.egui_ctx.clone();
             TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
                 match event {
                     TrayIconEvent::Click {
@@ -126,17 +133,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ..
                     } => {
                         let mut visible = VISIBLE.lock().unwrap();
-                        let window_handle = HWND(handle.hwnd.into());
-
-                        if *visible {
-                            unsafe {
-                                ShowWindow(window_handle, SW_HIDE);
-                            }
-                            *visible = false;
-                        } else {
+                        if !*visible {
+                            let window_handle = HWND(handle.hwnd.into());
                             unsafe {
                                 ShowWindow(window_handle, SW_SHOWDEFAULT);
                             }
+                            context_tray.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                            context_tray.send_viewport_cmd(egui::ViewportCommand::Focus);
                             *visible = true;
                         }
                     }
