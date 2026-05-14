@@ -21,6 +21,7 @@ pub(crate) fn generate_pin(length: usize) -> String {
 pub struct AppConfig {
     pub dark_mode: bool,
     pub pin: String,
+    pub auto_start: bool,
 }
 
 impl AppConfig {
@@ -30,6 +31,7 @@ impl AppConfig {
         Self {
             dark_mode: true,
             pin,
+            auto_start: false,
         }
     }
 
@@ -52,6 +54,7 @@ impl AppConfig {
 
         self.pin = String::from(json_value["pin"].as_str().unwrap_or(""));
         self.dark_mode = json_value["dark_mode"].as_bool().unwrap_or(true);
+        self.auto_start = json_value["auto_start"].as_bool().unwrap_or(false);
 
         Ok(())
     }
@@ -60,6 +63,7 @@ impl AppConfig {
         let json_value = json!({
             "dark_mode": self.dark_mode,
             "pin": self.pin,
+            "auto_start": self.auto_start,
         });
 
         let json_string = serde_json::to_string_pretty(&json_value).unwrap();

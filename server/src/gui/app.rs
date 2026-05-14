@@ -10,7 +10,8 @@ use egui::containers::ScrollArea;
 use egui::ecolor::Color32;
 use egui::widgets::TextEdit;
 use local_ip_address::list_afinet_netifas;
-use log::info;
+use log::{error, info};
+use std::process::Command;
 use tray_icon::menu::{MenuEvent, MenuId};
 
 pub struct App {
@@ -141,6 +142,12 @@ impl eframe::App for App {
             egui::menu::bar(ui, |ui| {
                 egui::menu::menu_button(ui, "File", |ui| {
                     ui.checkbox(&mut self.config.dark_mode, "Dark Mode");
+
+                    if ui.checkbox(&mut self.config.auto_start, "Auto Start").changed() {
+                        if let Err(e) = set_auto_start(self.config.auto_start) {
+                            error!("Failed to set auto start: {}", e);
+                        }
+                    }
 
                     if ui.button("Quit").clicked() {
                         ctx.send_viewport_cmd(ViewportCommand::Close)
@@ -340,4 +347,43 @@ impl eframe::App for App {
         crate::input::deinit_vigem();
         crate::stream::stop_gstreamer_pipeline()
     }
+}
+
+fn set_auto_start(enabled: bool) -> std::io::Result<()> {
+    let app_name = "RStreamServer";
+    if enabled {
+        let exe_path = std::env::current_exe()?;
+        let exe_path_str = exe_path
+            .to_str()
+            .ok_or(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid exe path",
+            ))?;
+        Command::new("reg")
+            .args(&[
+                "add",
+                "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                app_name,
+                "/t",
+                "REG_SZ",
+                "/d",
+                &format!("\"{}\" --minimized", exe_path_str),
+                "/f",
+            ])
+            .output()?;
+        info!("Auto-start enabled.");
+    } else {
+        let _ = Command::new("reg")
+            .args(&[
+                "delete",
+                "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                app_name,
+                "/f",
+            ])
+            .output();
+        info!("Auto-start disabled.");
+    }
+    Ok(())
 }

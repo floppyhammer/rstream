@@ -29,6 +29,14 @@ static VISIBLE: Mutex<bool> = Mutex::new(true);
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
+    let args: Vec<String> = env::args().collect();
+    let start_minimized = args.iter().any(|arg| arg == "--minimized");
+
+    if start_minimized {
+        let mut visible = VISIBLE.lock().unwrap();
+        *visible = false;
+    }
+
     let asset_dir = std::path::Path::new(env!("OUT_DIR")).join("assets");
     let icon = Icon::from_path(asset_dir.join("favicon.ico"), None)?;
 
@@ -84,6 +92,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let RawWindowHandle::Win32(handle) = cc.window_handle().unwrap().as_raw() else {
                 panic!("Unsupported platform");
             };
+
+            {
+                let visible = VISIBLE.lock().unwrap();
+                if !*visible {
+                    let window_handle = HWND(handle.hwnd.into());
+                    unsafe {
+                        ShowWindow(window_handle, SW_HIDE);
+                    }
+                }
+            }
 
             // let context = cc.egui_ctx.clone();
 
